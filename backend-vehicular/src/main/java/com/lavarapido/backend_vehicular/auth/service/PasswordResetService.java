@@ -1,9 +1,9 @@
-package com.lavarapido.backend_vehicular.service;
+package com.lavarapido.backend_vehicular.auth.service;
 
-import com.lavarapido.backend_vehicular.entities.TokenRecuperacion;
-import com.lavarapido.backend_vehicular.entities.User;
-import com.lavarapido.backend_vehicular.repository.TokenRecuperacionRepository;
-import com.lavarapido.backend_vehicular.repository.UserRepository;
+import com.lavarapido.backend_vehicular.auth.entity.TokenRecuperacion;
+import com.lavarapido.backend_vehicular.auth.repository.TokenRecuperacionRepository;
+import com.lavarapido.backend_vehicular.users.entity.User;
+import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;

@@ -1,10 +1,10 @@
-package com.lavarapido.backend_vehicular.controllers;
+package com.lavarapido.backend_vehicular.users.controller;
 
-import com.lavarapido.backend_vehicular.dto.LoginDTO;
-import com.lavarapido.backend_vehicular.dto.LoginResponseDTO;
-import com.lavarapido.backend_vehicular.dto.UserRegistrationDTO;
-import com.lavarapido.backend_vehicular.entities.User;
-import com.lavarapido.backend_vehicular.service.UserService;
+import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
+import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
+import com.lavarapido.backend_vehicular.users.entity.User;
+import com.lavarapido.backend_vehicular.users.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

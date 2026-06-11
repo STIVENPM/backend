@@ -1,6 +1,6 @@
-package com.lavarapido.backend_vehicular.repository;
+package com.lavarapido.backend_vehicular.users.repository;
 
-import com.lavarapido.backend_vehicular.entities.User;
+import com.lavarapido.backend_vehicular.users.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

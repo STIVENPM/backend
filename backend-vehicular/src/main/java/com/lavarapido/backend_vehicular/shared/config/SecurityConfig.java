@@ -1,4 +1,4 @@
-package com.lavarapido.backend_vehicular.config;
+package com.lavarapido.backend_vehicular.shared.config;
 
 import com.lavarapido.backend_vehicular.security.JwtAuthenticationFilter;
 

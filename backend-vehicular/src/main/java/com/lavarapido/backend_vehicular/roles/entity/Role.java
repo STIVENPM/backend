@@ -1,4 +1,4 @@
-package com.lavarapido.backend_vehicular.entities;
+package com.lavarapido.backend_vehicular.roles.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

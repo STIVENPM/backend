@@ -1,5 +1,6 @@
-package com.lavarapido.backend_vehicular.entities;
+package com.lavarapido.backend_vehicular.auth.entity;
 
+import com.lavarapido.backend_vehicular.users.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 

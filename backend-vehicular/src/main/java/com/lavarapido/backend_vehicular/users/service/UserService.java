@@ -1,12 +1,12 @@
-package com.lavarapido.backend_vehicular.service;
+package com.lavarapido.backend_vehicular.users.service;
 
-import com.lavarapido.backend_vehicular.dto.LoginDTO;
-import com.lavarapido.backend_vehicular.dto.LoginResponseDTO;
-import com.lavarapido.backend_vehicular.dto.UserRegistrationDTO;
-import com.lavarapido.backend_vehicular.entities.User;
-import com.lavarapido.backend_vehicular.repository.UserRepository;
-import com.lavarapido.backend_vehicular.repository.UserRoleRepository;
+import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
+import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
 import com.lavarapido.backend_vehicular.security.JwtService;
+import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
+import com.lavarapido.backend_vehicular.users.entity.User;
+import com.lavarapido.backend_vehicular.users.repository.UserRepository;
+import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;

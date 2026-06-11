@@ -1,6 +1,6 @@
-package com.lavarapido.backend_vehicular.controllers;
+package com.lavarapido.backend_vehicular.auth.controller;
 
-import com.lavarapido.backend_vehicular.service.PasswordResetService;
+import com.lavarapido.backend_vehicular.auth.service.PasswordResetService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

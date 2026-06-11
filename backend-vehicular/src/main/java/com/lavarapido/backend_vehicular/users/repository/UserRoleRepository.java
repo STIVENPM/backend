@@ -1,7 +1,7 @@
-package com.lavarapido.backend_vehicular.repository;
+package com.lavarapido.backend_vehicular.users.repository;
 
-import com.lavarapido.backend_vehicular.entities.UserRole;
-import com.lavarapido.backend_vehicular.entities.UserRoleId;
+import com.lavarapido.backend_vehicular.users.entity.UserRole;
+import com.lavarapido.backend_vehicular.users.entity.UserRoleId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

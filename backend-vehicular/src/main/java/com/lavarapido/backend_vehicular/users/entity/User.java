@@ -1,6 +1,6 @@
-package com.lavarapido.backend_vehicular.entities;
+package com.lavarapido.backend_vehicular.users.entity;
 
-import com.lavarapido.backend_vehicular.enums.DocumentType;
+import com.lavarapido.backend_vehicular.shared.enums.DocumentType;
 import jakarta.persistence.*;
 import lombok.*;
 

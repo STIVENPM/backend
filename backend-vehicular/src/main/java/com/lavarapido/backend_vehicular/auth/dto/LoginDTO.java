@@ -1,4 +1,4 @@
-package com.lavarapido.backend_vehicular.dto;
+package com.lavarapido.backend_vehicular.auth.dto;
 
 import lombok.*;
 

@@ -1,6 +1,6 @@
-package com.lavarapido.backend_vehicular.dto;
+package com.lavarapido.backend_vehicular.users.dto;
 
-import com.lavarapido.backend_vehicular.enums.DocumentType;
+import com.lavarapido.backend_vehicular.shared.enums.DocumentType;
 import lombok.*;
 
 @Getter

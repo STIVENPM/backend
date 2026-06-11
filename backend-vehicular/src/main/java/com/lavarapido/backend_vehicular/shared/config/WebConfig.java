@@ -1,4 +1,4 @@
-package com.lavarapido.backend_vehicular.config;
+package com.lavarapido.backend_vehicular.shared.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

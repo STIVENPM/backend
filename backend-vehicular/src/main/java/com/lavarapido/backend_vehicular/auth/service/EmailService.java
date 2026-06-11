@@ -1,4 +1,4 @@
-package com.lavarapido.backend_vehicular.service;
+package com.lavarapido.backend_vehicular.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

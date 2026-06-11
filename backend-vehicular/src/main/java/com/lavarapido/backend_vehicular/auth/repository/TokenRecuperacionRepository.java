@@ -1,6 +1,6 @@
-package com.lavarapido.backend_vehicular.repository;
+package com.lavarapido.backend_vehicular.auth.repository;
 
-import com.lavarapido.backend_vehicular.entities.TokenRecuperacion;
+import com.lavarapido.backend_vehicular.auth.entity.TokenRecuperacion;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

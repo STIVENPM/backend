@@ -1,4 +1,4 @@
-package com.lavarapido.backend_vehicular.entities;
+package com.lavarapido.backend_vehicular.users.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;

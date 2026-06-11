@@ -1,7 +1,8 @@
-package com.lavarapido.backend_vehicular.entities;
+package com.lavarapido.backend_vehicular.users.entity;
 
 import java.time.LocalDateTime;
 
+import com.lavarapido.backend_vehicular.roles.entity.Role;
 import jakarta.persistence.*;
 import lombok.*;
 

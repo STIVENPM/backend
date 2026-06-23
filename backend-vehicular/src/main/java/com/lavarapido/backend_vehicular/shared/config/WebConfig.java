@@ -32,13 +32,7 @@ public class WebConfig {
                         )
 
                         // 🔓 MÉTODOS HTTP PERMITIDOS
-                        .allowedMethods(
-                                "GET",
-                                "POST",
-                                "PUT",
-                                "DELETE",
-                                "OPTIONS"
-                        )
+                        .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
 
                         // 🔓 HEADERS PERMITIDOS
                         .allowedHeaders(

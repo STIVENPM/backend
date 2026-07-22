@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import org.springframework.http.HttpMethod;
+
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -78,8 +80,27 @@ public class SecurityConfig {
                     "/error"
                 ).permitAll()
 
+                // 🔒 MARCAS - gestion del catalogo (crear, editar, aprobar,
+                // ver pendientes, buscar) es exclusivo del rol ADMIN
+                .requestMatchers(
+                    "/api/marcas/pendientes",
+                    "/api/marcas/buscar"
+                ).hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/marcas").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/marcas/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/marcas/**").hasRole("ADMIN")
+
+                // 🔓 MARCAS - el catalogo aprobado lo puede ver cualquier
+                // usuario autenticado (cliente eligiendo marca de su vehiculo)
+                .requestMatchers("/api/marcas/activas").authenticated()
+
+                // 🔒 VEHICULOS - listar TODOS los vehiculos registrados
+                // (panel admin) es exclusivo del rol ADMIN
+                .requestMatchers(HttpMethod.GET, "/api/vehiculos").hasRole("ADMIN")
+
                 // 🔒 TODO LO DEMAS
-                // cualquier otra ruta necesita token JWT valido
+                // cualquier otra ruta necesita token JWT valido,
+                // sin importar el rol especifico del usuario
                 .anyRequest().authenticated()
             )
 

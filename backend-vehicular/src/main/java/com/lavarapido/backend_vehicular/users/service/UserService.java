@@ -78,8 +78,6 @@ public LoginResponseDTO login(LoginDTO dto) {
 
     User user = userOpt.get();
 
-
-
     boolean valid = passwordEncoder.matches(
         dto.getPassword(),
         user.getPassword()
@@ -96,7 +94,8 @@ public LoginResponseDTO login(LoginDTO dto) {
             .map(ur -> ur.getRole().getRoleName())
             .orElse("USER");
 
-    String token = jwtService.generateToken(user.getEmail());
+    // ← MODIFICADO: ahora se pasa el rol como segundo argumento
+    String token = jwtService.generateToken(user.getEmail(), roleName);
 
     LoginResponseDTO.UserInfoDTO info =
             new LoginResponseDTO.UserInfoDTO(

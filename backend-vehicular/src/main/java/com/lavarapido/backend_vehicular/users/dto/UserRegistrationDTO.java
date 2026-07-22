@@ -1,7 +1,10 @@
 package com.lavarapido.backend_vehicular.users.dto;
 
 import com.lavarapido.backend_vehicular.shared.enums.DocumentType;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter

@@ -46,6 +46,13 @@ public class MarcaService {
     }
 
     // ── LISTAR PENDIENTES (panel admin — solicitudes por revisar) ──
+    public List<MarcaResponseDTO> listarTodas() {
+        return marcaRepository.findAll()
+            .stream()
+            .map(this::mapearAResponse)
+            .toList();
+    }
+
     public List<MarcaResponseDTO> listarPendientes() {
         return marcaRepository.findByEstadoFalse()
             .stream()

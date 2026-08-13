@@ -39,6 +39,11 @@ public class MarcaController {
 
     // ── Solicitudes pendientes de aprobación (admin) ──────────────────
     // TODO: restringir a rol ADMIN cuando exista control de roles.
+    @GetMapping
+    public ResponseEntity<List<MarcaResponseDTO>> listarTodas() {
+        return ResponseEntity.ok(marcaService.listarTodas());
+    }
+
     @GetMapping("/pendientes")
     public ResponseEntity<List<MarcaResponseDTO>> listarPendientes() {
         return ResponseEntity.ok(marcaService.listarPendientes());

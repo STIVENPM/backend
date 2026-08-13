@@ -25,15 +25,10 @@ public record VehiculoRequestDTO(
     @NotNull(message = "El tipo de vehículo es obligatorio")
     TipoVehiculo tipoVehiculo,
 
-    // ── Marca: SOLO UNO de los dos campos debe venir, nunca ambos ni ninguno ──
-
-    // Caso 1: el cliente elige una marca ya existente del catálogo.
-    UUID fkIdMarca,
-
-    // Caso 2: el cliente no encuentra su marca y sugiere una nueva.
-    // El service la crea en `marcas` con estado = false (pendiente de
-    // aprobación) y usa ese id para el vehículo.
-    @Size(max = 30, message = "El nombre de la marca no puede superar los 30 caracteres")
-    String marcaSugerida
+    // Marca del catálogo aprobado (/api/marcas/activas). Si el cliente
+    // no encuentra la suya, debe pedirle al admin que la agregue desde
+    // el panel — ya no puede sugerir una marca nueva desde aquí.
+    @NotNull(message = "Debes seleccionar una marca del catálogo")
+    UUID fkIdMarca
 
 ) {}

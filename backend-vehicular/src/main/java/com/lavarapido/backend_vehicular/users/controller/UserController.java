@@ -2,14 +2,17 @@ package com.lavarapido.backend_vehicular.users.controller;
 
 import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
 import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/users")
@@ -45,14 +48,22 @@ public class UserController {
     }
 
     @GetMapping("/profile")
-    public String profile() {
+    public ResponseEntity<?> profile() {
+        try {
+            UserProfileResponseDTO response = userService.getProfile();
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
 
-        var auth = SecurityContextHolder
-                .getContext()
-                .getAuthentication();
-
-        String email = auth.getName();
-
-        return "Authenticated user: " + email;
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@Valid @RequestBody UserProfileUpdateDTO dto) {
+        try {
+            UserProfileResponseDTO response = userService.updateProfile(dto);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }

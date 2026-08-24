@@ -36,7 +36,7 @@ public class ServicioService {
     }
 
     public List<ServicioResponseDTO> listarTodos() {
-        return servicioRepository.findAll()
+        return servicioRepository.findByEstadoTrue()
                 .stream()
                 .map(this::mapearAResponse)
                 .collect(Collectors.toList());
@@ -80,17 +80,13 @@ public class ServicioService {
         return mapearAResponse(actualizado);
     }
 
-    public ServicioResponseDTO cambiarEstado(UUID id, boolean nuevoEstado) {
+    public ServicioResponseDTO cambiarEstado(UUID id, boolean activo) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));
 
-        servicio.setEstado(nuevoEstado);
+        servicio.setEstado(activo);
         Servicio actualizado = servicioRepository.save(servicio);
         return mapearAResponse(actualizado);
-    }
-
-    public void eliminar(UUID id) {
-        cambiarEstado(id, false);
     }
 
     private ServicioResponseDTO mapearAResponse(Servicio servicio) {

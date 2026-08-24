@@ -2,6 +2,9 @@ package com.lavarapido.backend_vehicular.auth.controller;
 
 import com.lavarapido.backend_vehicular.auth.service.PasswordResetService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +26,7 @@ public class PasswordResetController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(
-            @RequestBody ForgotPasswordRequest request,
+            @Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest) {
 
         // Captura la IP del solicitante para auditoría
@@ -31,7 +34,6 @@ public class PasswordResetController {
 
         passwordResetService.solicitarRecuperacion(request.email(), ip);
 
-        // Siempre responde igual para no revelar si el email existe
         return ResponseEntity.ok("Si el correo está registrado, recibirás un enlace.");
     }
 
@@ -58,7 +60,10 @@ public class PasswordResetController {
     // Records de Java: clases simples de solo lectura para recibir el JSON
 
     /** Body del primer endpoint */
-    record ForgotPasswordRequest(String email) {}
+    record ForgotPasswordRequest(
+            @NotBlank(message = "El correo es obligatorio")
+            @Email(message = "El correo no tiene un formato valido")
+            String email) {}
 
     /** Body del segundo endpoint */
     record ResetPasswordRequest(String token, String nuevaContrasena) {}

@@ -1,14 +1,16 @@
 package com.lavarapido.backend_vehicular.auth.service;
 
 import com.lavarapido.backend_vehicular.auth.entity.TokenRecuperacion;
+import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
+import com.lavarapido.backend_vehicular.auth.exception.UserNotFoundException;
 import com.lavarapido.backend_vehicular.auth.repository.TokenRecuperacionRepository;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.mail.MailException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -35,33 +37,31 @@ public class PasswordResetService {
      * Busca el usuario por email, genera un token seguro,
      * lo guarda hasheado en BD y envía el enlace por correo.
      *
-     * Si el email no existe no lanza error (por seguridad,
-     * no revelamos si el correo está registrado o no).
+    * Si el email no existe se informa al controlador mediante una
+    * excepcion de dominio para devolver una respuesta clara.
      */
     @Transactional
     public void solicitarRecuperacion(String email, String ipSolicitante) {
 
-        // Busca el usuario — si no existe termina silenciosamente
-        userRepository.findByEmail(email).ifPresent(usuario -> {
+        User usuario = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("No existe un usuario con ese correo"));
 
-            // Genera token aleatorio seguro en texto plano
-            String tokenPlano = generarTokenSeguro();
+        String tokenPlano = generarTokenSeguro();
+        String tokenHash = hashearSHA256(tokenPlano);
 
-            // Hashea el token con SHA-256 para guardarlo en BD
-            String tokenHash = hashearSHA256(tokenPlano);
+        TokenRecuperacion token = new TokenRecuperacion();
+        token.setUsuario(usuario);
+        token.setTokenHash(tokenHash);
+        token.setExpiracionAt(LocalDateTime.now().plusMinutes(TTL_MINUTOS));
+        token.setUsado(false);
+        token.setIpSolicitante(ipSolicitante);
+        tokenRepository.save(token);
 
-            // Construye y guarda la entidad en tokens_recuperacion
-            TokenRecuperacion token = new TokenRecuperacion();
-            token.setUsuario(usuario);
-            token.setTokenHash(tokenHash);
-            token.setExpiracionAt(LocalDateTime.now().plusMinutes(TTL_MINUTOS));
-            token.setUsado(false);
-            token.setIpSolicitante(ipSolicitante);
-            tokenRepository.save(token);
-
-            // Envía el correo con el token en texto plano
+        try {
             emailService.enviarCorreoRecuperacion(email, tokenPlano);
-        });
+        } catch (MailException | IllegalStateException exception) {
+            throw new EmailDeliveryException("No fue posible enviar el correo de recuperacion", exception);
+        }
     }
 
     // ── PASO 2: El usuario hace clic en el enlace y manda nueva contraseña ──

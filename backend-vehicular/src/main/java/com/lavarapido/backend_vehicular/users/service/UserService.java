@@ -10,26 +10,23 @@ import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private JwtService jwtService;
+    private final JwtService jwtService;
 
-    @Autowired
-    private UserRoleRepository userRoleRepository;
+    private final UserRoleRepository userRoleRepository;
 
     // 🔥 REGISTRO DE USUARIO
     // @Transactional garantiza que si ocurre un error durante el proceso,

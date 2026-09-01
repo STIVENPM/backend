@@ -74,6 +74,9 @@ public class VehiculoService {
     // ── OBTENER POR ID ─────────────────────────────────────────────
     public VehiculoResponseDTO obtenerPorId(UUID idVehiculo) {
         Vehiculo vehiculo = buscarVehiculoOrThrow(idVehiculo);
+        User usuarioAutenticado = obtenerUsuarioAutenticado();
+
+        validarPropietarioOAdmin(vehiculo, usuarioAutenticado);
         return mapearAResponse(vehiculo);
     }
 

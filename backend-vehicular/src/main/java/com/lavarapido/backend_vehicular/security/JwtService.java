@@ -3,7 +3,7 @@ package com.lavarapido.backend_vehicular.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -12,13 +12,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Service
+@RequiredArgsConstructor
 public class JwtService {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final JwtProperties jwtProperties;
 
     private SecretKey getKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
     // ── MODIFICADO: ahora recibe también el rol y lo mete como claim ──

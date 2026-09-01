@@ -19,8 +19,7 @@ public class MarcaController {
 
     private final MarcaService marcaService;
 
-    // ── Crear marca directamente (admin — ya aprobada) ───────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
     @PostMapping
     public ResponseEntity<?> crear(@Valid @RequestBody MarcaRequestDTO dto) {
         try {
@@ -37,8 +36,7 @@ public class MarcaController {
         return ResponseEntity.ok(marcaService.listarActivas());
     }
 
-    // ── Solicitudes pendientes de aprobación (admin) ──────────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
     @GetMapping
     public ResponseEntity<List<MarcaResponseDTO>> listarTodas() {
         return ResponseEntity.ok(marcaService.listarTodas());
@@ -49,8 +47,7 @@ public class MarcaController {
         return ResponseEntity.ok(marcaService.listarPendientes());
     }
 
-    // ── Búsqueda en el catálogo completo (admin) ──────────────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
     @GetMapping("/buscar")
     public ResponseEntity<List<MarcaResponseDTO>> buscar(@RequestParam String nombre) {
         return ResponseEntity.ok(marcaService.buscar(nombre));
@@ -66,8 +63,7 @@ public class MarcaController {
         }
     }
 
-    // ── Actualizar (corregir nombre — admin) ──────────────────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizar(
             @PathVariable UUID id,
@@ -80,8 +76,7 @@ public class MarcaController {
         }
     }
 
-    // ── Cambiar estado (aprobar pendiente / activar-desactivar — admin) ──
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
     @PatchMapping("/{id}/estado")
     public ResponseEntity<?> cambiarEstado(
             @PathVariable UUID id,

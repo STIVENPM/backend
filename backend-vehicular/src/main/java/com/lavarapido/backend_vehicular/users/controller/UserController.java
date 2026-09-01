@@ -8,7 +8,7 @@ import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.service.UserService;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,10 +16,10 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
     // 🔥 REGISTRO
     @PostMapping("/register")

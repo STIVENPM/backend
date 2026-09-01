@@ -2,7 +2,7 @@ package com.lavarapido.backend_vehicular.shared.config;
 
 import com.lavarapido.backend_vehicular.security.JwtAuthenticationFilter;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,10 +26,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Autowired
-    private JwtAuthenticationFilter jwtFilter;
+    private final JwtAuthenticationFilter jwtFilter;
 
     @Bean
     public SecurityFilterChain filterChain(
@@ -89,6 +89,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/marcas").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/marcas/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/api/marcas/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/marcas").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/marcas/{id}").hasRole("ADMIN")
+
+                // 🔒 SERVICIOS - gestion del catalogo (RF4) exclusiva de ADMIN
+                .requestMatchers(HttpMethod.POST, "/api/servicios").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/servicios/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/servicios/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/servicios/**").authenticated()
 
                 // 🔓 MARCAS - el catalogo aprobado lo puede ver cualquier
                 // usuario autenticado (cliente eligiendo marca de su vehiculo)
@@ -98,7 +106,7 @@ public class SecurityConfig {
                 // (panel admin) es exclusivo del rol ADMIN
                 .requestMatchers(HttpMethod.GET, "/api/vehiculos").hasRole("ADMIN")
 
-                // 🔒 TODO LO DEMAS
+                // 🔒 RESTO DE RUTAS
                 // cualquier otra ruta necesita token JWT valido,
                 // sin importar el rol especifico del usuario
                 .anyRequest().authenticated()

@@ -1,6 +1,6 @@
 package com.lavarapido.backend_vehicular.users.entity;
 
-import com.lavarapido.backend_vehicular.shared.enums.DocumentType;
+import com.lavarapido.backend_vehicular.users.enums.DocumentType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

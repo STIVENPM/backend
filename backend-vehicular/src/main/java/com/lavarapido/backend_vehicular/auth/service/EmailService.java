@@ -1,7 +1,7 @@
 package com.lavarapido.backend_vehicular.auth.service;
 
-import com.lavarapido.backend_vehicular.shared.config.AppFrontendProperties;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 public class EmailService {
 
     private final JavaMailSender mailSender;
-    private final AppFrontendProperties appFrontendProperties;
+
+    @Value("${app.frontend.url}")
+    private String appFrontendUrl;
 
     /**
      * Envía el correo de recuperación de contraseña.
@@ -25,7 +27,7 @@ public class EmailService {
 
         // Arma el enlace que irá en el correo
         // ejemplo: http://localhost:5173/reset-password?token=abc123
-        String enlace = appFrontendProperties.getUrl() + "/reset-password?token=" + tokenPlano;
+        String enlace = appFrontendUrl + "/reset-password?token=" + tokenPlano;
 
         SimpleMailMessage mensaje = new SimpleMailMessage();
         mensaje.setTo(destinatario);

@@ -106,6 +106,15 @@ public class SecurityConfig {
                 // (panel admin) es exclusivo del rol ADMIN
                 .requestMatchers(HttpMethod.GET, "/api/vehiculos").hasRole("ADMIN")
 
+                // RESERVAS: listado y cambio de estado para el panel ADMIN.
+                .requestMatchers(HttpMethod.GET, "/api/reservas").hasRole("ADMIN")
+                // La cancelación también puede hacerla el dueño; el servicio valida ownership.
+                .requestMatchers(HttpMethod.PATCH, "/api/reservas/*/cancelar").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/reservas/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/reservas").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/reservas/{id}").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/reservas/usuario/{id}").authenticated()
+
                 // 🔒 RESTO DE RUTAS
                 // cualquier otra ruta necesita token JWT valido,
                 // sin importar el rol especifico del usuario

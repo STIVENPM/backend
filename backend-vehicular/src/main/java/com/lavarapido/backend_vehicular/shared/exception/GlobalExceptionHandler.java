@@ -5,6 +5,7 @@ import com.lavarapido.backend_vehicular.auth.exception.UserNotFoundException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,6 +28,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleEmailDelivery(EmailDeliveryException exception) {
         logger.error("Error enviando correo de recuperacion", exception);
         return response(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(RecursoNoEncontradoException.class)
+    public ResponseEntity<Map<String, String>> handleResourceNotFound(RecursoNoEncontradoException exception) {
+        return response(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException exception) {
+        return response(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 
     @ExceptionHandler(DataAccessException.class)

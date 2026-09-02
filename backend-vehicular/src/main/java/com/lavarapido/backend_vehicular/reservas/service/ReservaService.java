@@ -13,11 +13,13 @@ import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
+import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,7 @@ public class ReservaService {
 
     private final ReservaRepository reservaRepository;
     private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
     private final VehiculoRepository vehiculoRepository;
     private final ServicioRepository servicioRepository;
 
@@ -46,7 +49,7 @@ public class ReservaService {
         Servicio servicio = servicioRepository.findById(request.getFkIdServicio())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Servicio no encontrado"));
 
-        if (!vehiculo.getUsuario().getUserId().equals(usuario.getUserId())) {
+        if (!esAdmin(usuario) && !vehiculo.getUsuario().getUserId().equals(usuario.getUserId())) {
             throw new VehiculoNoPerteneceUsuarioException("El vehículo no pertenece al usuario autenticado");
         }
 
@@ -60,7 +63,7 @@ public class ReservaService {
                 request.getFechaReserva(),
                 request.getHoraReserva(),
                 horaFin,
-                EstadoReserva.CANCELADA
+                EstadoReserva.CANCELADA.name()
         );
 
         if (!solapamientos.isEmpty()) {
@@ -68,7 +71,7 @@ public class ReservaService {
         }
 
         Reserva reserva = Reserva.builder()
-                .usuario(usuario)
+                .usuario(vehiculo.getUsuario())
                 .vehiculo(vehiculo)
                 .servicio(servicio)
                 .fechaReserva(request.getFechaReserva())
@@ -82,11 +85,27 @@ public class ReservaService {
     public ReservaResponseDTO obtenerPorId(UUID idReserva) {
         Reserva reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
+        validarPropietarioOAdmin(reserva, obtenerUsuarioAutenticado());
         return mapearAResponse(reserva);
     }
 
     public List<ReservaResponseDTO> obtenerPorUsuario(UUID idUsuario) {
+        User usuarioSolicitado = userRepository.findById(idUsuario)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
+        User usuarioAutenticado = obtenerUsuarioAutenticado();
+
+        if (!usuarioSolicitado.getUserId().equals(usuarioAutenticado.getUserId()) && !esAdmin(usuarioAutenticado)) {
+            throw new AccessDeniedException("No tienes permiso para consultar las reservas de este usuario");
+        }
+
         return reservaRepository.findByUsuario_UserIdOrderByFechaReservaDescHoraReservaDesc(idUsuario)
+                .stream()
+                .map(this::mapearAResponse)
+                .toList();
+    }
+
+    public List<ReservaResponseDTO> obtenerTodas() {
+        return reservaRepository.findAll()
                 .stream()
                 .map(this::mapearAResponse)
                 .toList();
@@ -113,6 +132,9 @@ public class ReservaService {
 
     @Transactional
     public ReservaResponseDTO cancelar(UUID idReserva) {
+        Reserva reserva = reservaRepository.findById(idReserva)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
+        validarPropietarioOAdmin(reserva, obtenerUsuarioAutenticado());
         return cambiarEstado(idReserva, EstadoReserva.CANCELADA);
     }
 
@@ -173,6 +195,19 @@ public class ReservaService {
 
         return userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario autenticado no encontrado"));
+    }
+
+    private boolean esAdmin(User usuario) {
+        return userRoleRepository.findActiveRoleByUserId(usuario.getUserId())
+                .map(userRole -> "ADMIN".equals(userRole.getRole().getRoleName()))
+                .orElse(false);
+    }
+
+    private void validarPropietarioOAdmin(Reserva reserva, User usuarioAutenticado) {
+        boolean esPropietario = reserva.getUsuario().getUserId().equals(usuarioAutenticado.getUserId());
+        if (!esPropietario && !esAdmin(usuarioAutenticado)) {
+            throw new AccessDeniedException("No tienes permiso para acceder a esta reserva");
+        }
     }
 
     private ReservaResponseDTO mapearAResponse(Reserva reserva) {

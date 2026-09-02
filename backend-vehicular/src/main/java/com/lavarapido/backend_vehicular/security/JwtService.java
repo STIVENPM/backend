@@ -4,6 +4,7 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -15,10 +16,11 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class JwtService {
 
-    private final JwtProperties jwtProperties;
+    @Value("${jwt.secret}")
+    private String jwtSecret;
 
     private SecretKey getKey() {
-        return Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     // ── MODIFICADO: ahora recibe también el rol y lo mete como claim ──

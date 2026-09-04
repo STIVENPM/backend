@@ -94,6 +94,9 @@ public class SecurityConfig {
                     "/error"
                 ).permitAll()
 
+                // Wompi does not send JWT; integrity is checked in PagoController.
+                .requestMatchers(HttpMethod.POST, "/api/pagos/webhook").permitAll()
+
 
                 // =====================================================
                 // MARCAS

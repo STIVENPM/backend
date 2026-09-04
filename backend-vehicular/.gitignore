@@ -34,3 +34,4 @@ build/
 
 # Credenciales locales de desarrollo (la plantilla versionada es application-example.properties).
 /application-local.properties
+/application-wompi-local.properties

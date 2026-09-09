@@ -252,9 +252,36 @@ public class SecurityConfig {
 
 
                 // =====================================================
+                // OPERADORES
+                // =====================================================
+                .requestMatchers(
+                    "/api/operadores/**"
+                ).hasRole("ADMIN")
+
+
+                // =====================================================
+                // ASIGNACIONES
+                // =====================================================
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/asignaciones"
+                ).hasRole("ADMIN")
+
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/asignaciones/mis-asignaciones"
+                ).hasRole("OPERATOR")
+
+                .requestMatchers(
+                    HttpMethod.PATCH,
+                    "/api/asignaciones/**"
+                ).hasRole("OPERATOR")
+
+
+                // =====================================================
                 // CUALQUIER OTRO ENDPOINT
                 // =====================================================
-                .anyRequest().authenticated()
+               .anyRequest().authenticated() 
             )
 
 

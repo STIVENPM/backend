@@ -258,6 +258,20 @@ public class SecurityConfig {
                     "/api/operadores/**"
                 ).hasRole("ADMIN")
 
+                // =====================================================
+                // AUDITORIA Y LOGS DE ERRORES
+                // =====================================================
+                .requestMatchers(
+                    "/api/auditoria/**",
+                    "/api/log-errores/**"
+                ).hasRole("ADMIN")
+
+                // Calificaciones: el servicio valida propietario o ADMIN
+                // cuando se consulta una reserva concreta.
+                .requestMatchers(
+                    "/api/calificaciones/**"
+                ).authenticated()
+
 
                 // =====================================================
                 // ASIGNACIONES

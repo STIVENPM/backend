@@ -1,5 +1,7 @@
 package com.lavarapido.backend_vehicular.reservas.service;
 
+import com.lavarapido.backend_vehicular.asignaciones.entity.Asignacion;
+import com.lavarapido.backend_vehicular.asignaciones.repository.AsignacionRepository;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaRequestDTO;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
@@ -24,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -36,7 +40,8 @@ public class ReservaService {
     private final UserRoleRepository userRoleRepository;
     private final VehiculoRepository vehiculoRepository;
     private final ServicioRepository servicioRepository;
-    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, UserRoleRepository userRoleRepository, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.userRoleRepository=userRoleRepository; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; }
+    private final AsignacionRepository asignacionRepository;
+    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, UserRoleRepository userRoleRepository, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.userRoleRepository=userRoleRepository; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; }
 
     @Transactional
     public ReservaResponseDTO crear(ReservaRequestDTO request) {
@@ -85,7 +90,12 @@ public class ReservaService {
         Reserva reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         validarPropietarioOAdmin(reserva, obtenerUsuarioAutenticado());
-        return mapearAResponse(reserva);
+
+        String operadorNombre = asignacionRepository.findByReserva_IdReserva(idReserva)
+                .map(this::mapearNombreOperador)
+                .orElse(null);
+
+        return mapearAResponse(reserva, operadorNombre);
     }
 
     public List<ReservaResponseDTO> obtenerPorUsuario(UUID idUsuario) {
@@ -97,17 +107,13 @@ public class ReservaService {
             throw new AccessDeniedException("No tienes permiso para consultar las reservas de este usuario");
         }
 
-        return reservaRepository.findByUsuario_UserIdOrderByFechaReservaDescHoraReservaDesc(idUsuario)
-                .stream()
-                .map(this::mapearAResponse)
-                .toList();
+        List<Reserva> reservas = reservaRepository.findByUsuario_UserIdOrderByFechaReservaDescHoraReservaDesc(idUsuario);
+        return mapearReservas(reservas);
     }
 
     public List<ReservaResponseDTO> obtenerTodas() {
-        return reservaRepository.findAll()
-                .stream()
-                .map(this::mapearAResponse)
-                .toList();
+        List<Reserva> reservas = reservaRepository.findAll();
+        return mapearReservas(reservas);
     }
 
     @Transactional
@@ -209,7 +215,40 @@ public class ReservaService {
         }
     }
 
+    private List<ReservaResponseDTO> mapearReservas(List<Reserva> reservas) {
+        if (reservas == null || reservas.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, String> operadorNombrePorReserva = new HashMap<>();
+        List<UUID> idsReservas = reservas.stream()
+                .map(Reserva::getIdReserva)
+                .toList();
+
+        List<Asignacion> asignaciones = asignacionRepository.findByReserva_IdReservaIn(idsReservas);
+        for (Asignacion asignacion : asignaciones) {
+            operadorNombrePorReserva.put(asignacion.getReserva().getIdReserva(), mapearNombreOperador(asignacion));
+        }
+
+        return reservas.stream()
+                .map(reserva -> mapearAResponse(reserva, operadorNombrePorReserva.get(reserva.getIdReserva())))
+                .toList();
+    }
+
+    private String mapearNombreOperador(Asignacion asignacion) {
+        User usuarioOperador = asignacion.getOperador().getUsuario();
+        String nombreOperador = usuarioOperador.getFirstName();
+        if (usuarioOperador.getLastName() != null && !usuarioOperador.getLastName().isBlank()) {
+            nombreOperador += " " + usuarioOperador.getLastName();
+        }
+        return nombreOperador;
+    }
+
     private ReservaResponseDTO mapearAResponse(Reserva reserva) {
+        return mapearAResponse(reserva, null);
+    }
+
+    private ReservaResponseDTO mapearAResponse(Reserva reserva, String operadorNombre) {
         User usuario = reserva.getUsuario();
         Vehiculo vehiculo = reserva.getVehiculo();
         Servicio servicio = reserva.getServicio();
@@ -237,7 +276,8 @@ public class ReservaService {
                 reserva.getFechaHoraFin(),
                 reserva.getEstado(),
                 reserva.getCreatedAt(),
-                reserva.getUpdatedAt()
+                reserva.getUpdatedAt(),
+                operadorNombre
         );
     }
 }

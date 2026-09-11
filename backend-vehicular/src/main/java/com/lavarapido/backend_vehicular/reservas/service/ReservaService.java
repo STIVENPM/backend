@@ -16,7 +16,6 @@ import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
@@ -30,7 +29,6 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class ReservaService {
 
     private final ReservaRepository reservaRepository;
@@ -38,6 +36,7 @@ public class ReservaService {
     private final UserRoleRepository userRoleRepository;
     private final VehiculoRepository vehiculoRepository;
     private final ServicioRepository servicioRepository;
+    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, UserRoleRepository userRoleRepository, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.userRoleRepository=userRoleRepository; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; }
 
     @Transactional
     public ReservaResponseDTO crear(ReservaRequestDTO request) {

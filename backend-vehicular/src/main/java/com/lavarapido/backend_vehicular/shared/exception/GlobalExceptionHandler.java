@@ -2,6 +2,7 @@ package com.lavarapido.backend_vehicular.shared.exception;
 
 import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
 import com.lavarapido.backend_vehicular.auth.exception.UserNotFoundException;
+import com.lavarapido.backend_vehicular.pagos.exception.WompiConfiguracionException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,6 +44,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, String>> handleDatabase(DataAccessException exception) {
         return response(HttpStatus.SERVICE_UNAVAILABLE, "No fue posible acceder a la base de datos");
+    }
+
+    @ExceptionHandler(WompiConfiguracionException.class)
+    public ResponseEntity<Map<String, String>> handleWompiConfiguracion(WompiConfiguracionException exception) {
+        logger.error("Error de configuración de Wompi", exception);
+        return response(HttpStatus.INTERNAL_SERVER_ERROR, "Error de configuración del servicio de pagos");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

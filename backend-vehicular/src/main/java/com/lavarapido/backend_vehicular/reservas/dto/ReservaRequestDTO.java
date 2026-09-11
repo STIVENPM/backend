@@ -1,19 +1,11 @@
 package com.lavarapido.backend_vehicular.reservas.dto;
 
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class ReservaRequestDTO {
 
     @NotNull(message = "El vehículo es obligatorio")
@@ -27,4 +19,6 @@ public class ReservaRequestDTO {
 
     @NotNull(message = "La hora de la reserva es obligatoria")
     private LocalTime horaReserva;
+    public ReservaRequestDTO() { } public ReservaRequestDTO(UUID fkIdVehiculo, UUID fkIdServicio, LocalDate fechaReserva, LocalTime horaReserva) { this.fkIdVehiculo=fkIdVehiculo;this.fkIdServicio=fkIdServicio;this.fechaReserva=fechaReserva;this.horaReserva=horaReserva; }
+    public UUID getFkIdVehiculo(){return fkIdVehiculo;} public void setFkIdVehiculo(UUID v){fkIdVehiculo=v;} public UUID getFkIdServicio(){return fkIdServicio;} public void setFkIdServicio(UUID v){fkIdServicio=v;} public LocalDate getFechaReserva(){return fechaReserva;} public void setFechaReserva(LocalDate v){fechaReserva=v;} public LocalTime getHoraReserva(){return horaReserva;} public void setHoraReserva(LocalTime v){horaReserva=v;}
 }

@@ -7,22 +7,12 @@ import com.lavarapido.backend_vehicular.vehiculos.enums.TipoVehiculo;
 
 import jakarta.persistence.*;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "vehiculos")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Vehiculo {
 
     // =========================================================
@@ -110,7 +100,6 @@ public class Vehiculo {
         name = "estado",
         nullable = false
     )
-    @Builder.Default
     private Boolean estado = true;
 
 
@@ -135,6 +124,18 @@ public class Vehiculo {
         nullable = false
     )
     private LocalDateTime updatedAt;
+
+    public Vehiculo() { }
+    public Vehiculo(UUID idVehiculo, User usuario, Marca marca, String placa, String color, TipoVehiculo tipoVehiculo, Boolean estado, LocalDateTime createdAt, LocalDateTime updatedAt) { this.idVehiculo=idVehiculo; this.usuario=usuario; this.marca=marca; this.placa=placa; this.color=color; this.tipoVehiculo=tipoVehiculo; this.estado=estado; this.createdAt=createdAt; this.updatedAt=updatedAt; }
+    public UUID getIdVehiculo(){return idVehiculo;} public void setIdVehiculo(UUID v){idVehiculo=v;}
+    public User getUsuario(){return usuario;} public void setUsuario(User v){usuario=v;}
+    public Marca getMarca(){return marca;} public void setMarca(Marca v){marca=v;}
+    public String getPlaca(){return placa;} public void setPlaca(String v){placa=v;}
+    public String getColor(){return color;} public void setColor(String v){color=v;}
+    public TipoVehiculo getTipoVehiculo(){return tipoVehiculo;} public void setTipoVehiculo(TipoVehiculo v){tipoVehiculo=v;}
+    public Boolean getEstado(){return estado;} public void setEstado(Boolean v){estado=v;}
+    public LocalDateTime getCreatedAt(){return createdAt;} public void setCreatedAt(LocalDateTime v){createdAt=v;}
+    public LocalDateTime getUpdatedAt(){return updatedAt;} public void setUpdatedAt(LocalDateTime v){updatedAt=v;}
 
 
     // =========================================================

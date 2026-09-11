@@ -4,7 +4,6 @@ import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoRequestDTO;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoResponseDTO;
 import com.lavarapido.backend_vehicular.vehiculos.service.VehiculoService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,10 +12,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/vehiculos")
-@RequiredArgsConstructor
 public class VehiculoController {
 
     private final VehiculoService vehiculoService;
+    public VehiculoController(VehiculoService vehiculoService) { this.vehiculoService = vehiculoService; }
 
     // ── Crear vehículo (app móvil — cliente autenticado) ────────────
     @PostMapping

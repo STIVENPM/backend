@@ -2,16 +2,21 @@ package com.lavarapido.backend_vehicular.pagos.service;
 
 import tools.jackson.databind.JsonNode;
 import com.lavarapido.backend_vehicular.pagos.config.WompiProperties;
+import com.lavarapido.backend_vehicular.pagos.exception.WompiConfiguracionException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class WompiSignatureService {
+    private static final Logger logger = LoggerFactory.getLogger(WompiSignatureService.class);
     private final WompiProperties properties;
 
     public String crearFirmaIntegridad(String referencia, long montoEnCentavos, String moneda) {
@@ -23,6 +28,13 @@ public class WompiSignatureService {
         JsonNode propertyNames = signature.path("properties");
         String recibido = checksumHeader != null && !checksumHeader.isBlank()
                 ? checksumHeader : signature.path("checksum").asString();
+
+        if (checksumHeader != null && !checksumHeader.isBlank()) {
+            logger.info("Validando webhook Wompi usando checksum del header X-Event-Checksum");
+        } else if (signature.hasNonNull("checksum") && !signature.path("checksum").asText().isBlank()) {
+            logger.info("Validando webhook Wompi usando checksum del body signature.checksum");
+        }
+
         if (!propertyNames.isArray() || recibido == null || recibido.isBlank() || evento.path("timestamp").isMissingNode()) return false;
 
         StringBuilder contenido = new StringBuilder();
@@ -33,9 +45,11 @@ public class WompiSignatureService {
         }
         contenido.append(evento.path("timestamp").asString());
         contenido.append(requiredSecret(properties.getEventsSecret(), "eventos"));
+
+        String recibidoNormalizado = recibido.toLowerCase(Locale.ROOT);
         return MessageDigest.isEqual(
                 sha256(contenido.toString()).getBytes(StandardCharsets.UTF_8),
-                recibido.getBytes(StandardCharsets.UTF_8));
+                recibidoNormalizado.getBytes(StandardCharsets.UTF_8));
     }
 
     private JsonNode leerRuta(JsonNode root, String path) {
@@ -45,7 +59,9 @@ public class WompiSignatureService {
     }
 
     private String requiredSecret(String value, String nombre) {
-        if (value == null || value.isBlank()) throw new IllegalStateException("No está configurado el secreto de " + nombre + " de Wompi");
+        if (value == null || value.isBlank()) {
+            throw new WompiConfiguracionException("No está configurado el secreto de " + nombre + " de Wompi");
+        }
         return value;
     }
 

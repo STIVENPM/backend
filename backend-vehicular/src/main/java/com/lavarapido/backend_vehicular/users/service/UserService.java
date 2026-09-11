@@ -10,14 +10,12 @@ import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
@@ -27,6 +25,7 @@ public class UserService {
     private final JwtService jwtService;
 
     private final UserRoleRepository userRoleRepository;
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, UserRoleRepository userRoleRepository) { this.userRepository=userRepository; this.passwordEncoder=passwordEncoder; this.jwtService=jwtService; this.userRoleRepository=userRoleRepository; }
 
     // 🔥 REGISTRO DE USUARIO
     // @Transactional garantiza que si ocurre un error durante el proceso,

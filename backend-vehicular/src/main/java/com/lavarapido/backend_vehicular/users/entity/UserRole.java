@@ -10,17 +10,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Table(name = "user_roles")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class UserRole {
 
     @EmbeddedId
@@ -50,4 +42,7 @@ public class UserRole {
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+    public UserRole() { }
+    public UserRole(UserRoleId id, User user, Role role, Boolean status, LocalDateTime assignedAt, LocalDateTime revokedAt, LocalDateTime createdAt, LocalDateTime updatedAt) { this.id=id; this.user=user; this.role=role; this.status=status; this.assignedAt=assignedAt; this.revokedAt=revokedAt; this.createdAt=createdAt; this.updatedAt=updatedAt; }
+    public UserRoleId getId(){return id;} public void setId(UserRoleId v){id=v;} public User getUser(){return user;} public void setUser(User v){user=v;} public Role getRole(){return role;} public void setRole(Role v){role=v;} public Boolean getStatus(){return status;} public void setStatus(Boolean v){status=v;} public LocalDateTime getAssignedAt(){return assignedAt;} public void setAssignedAt(LocalDateTime v){assignedAt=v;} public LocalDateTime getRevokedAt(){return revokedAt;} public void setRevokedAt(LocalDateTime v){revokedAt=v;} public LocalDateTime getCreatedAt(){return createdAt;} public void setCreatedAt(LocalDateTime v){createdAt=v;} public LocalDateTime getUpdatedAt(){return updatedAt;} public void setUpdatedAt(LocalDateTime v){updatedAt=v;}
 }

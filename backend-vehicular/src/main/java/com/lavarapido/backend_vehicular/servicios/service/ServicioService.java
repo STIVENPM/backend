@@ -11,13 +11,13 @@ import com.lavarapido.backend_vehicular.servicios.dto.ServicioResponseDTO;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
 import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 
-import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class ServicioService {
 
     private final ServicioRepository servicioRepository;
+
+    public ServicioService(ServicioRepository servicioRepository) { this.servicioRepository = servicioRepository; }
 
     public ServicioResponseDTO crear(ServicioRequestDTO request) {
         if (servicioRepository.existsByNombre(request.getNombre())) {

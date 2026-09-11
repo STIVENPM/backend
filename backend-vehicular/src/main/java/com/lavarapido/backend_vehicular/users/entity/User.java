@@ -9,20 +9,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class User {
 
     @Id
@@ -66,4 +58,7 @@ public class User {
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+    public User() { }
+    public User(UUID userId, String email, String firstName, String lastName, String phoneNumber, DocumentType documentType, String documentNumber, String password, String profilePicture, Boolean status, LocalDateTime createdAt, LocalDateTime updatedAt) { this.userId=userId; this.email=email; this.firstName=firstName; this.lastName=lastName; this.phoneNumber=phoneNumber; this.documentType=documentType; this.documentNumber=documentNumber; this.password=password; this.profilePicture=profilePicture; this.status=status; this.createdAt=createdAt; this.updatedAt=updatedAt; }
+    public UUID getUserId(){return userId;} public void setUserId(UUID v){userId=v;} public String getEmail(){return email;} public void setEmail(String v){email=v;} public String getFirstName(){return firstName;} public void setFirstName(String v){firstName=v;} public String getLastName(){return lastName;} public void setLastName(String v){lastName=v;} public String getPhoneNumber(){return phoneNumber;} public void setPhoneNumber(String v){phoneNumber=v;} public DocumentType getDocumentType(){return documentType;} public void setDocumentType(DocumentType v){documentType=v;} public String getDocumentNumber(){return documentNumber;} public void setDocumentNumber(String v){documentNumber=v;} public String getPassword(){return password;} public void setPassword(String v){password=v;} public String getProfilePicture(){return profilePicture;} public void setProfilePicture(String v){profilePicture=v;} public Boolean getStatus(){return status;} public void setStatus(Boolean v){status=v;} public LocalDateTime getCreatedAt(){return createdAt;} public void setCreatedAt(LocalDateTime v){createdAt=v;} public LocalDateTime getUpdatedAt(){return updatedAt;} public void setUpdatedAt(LocalDateTime v){updatedAt=v;}
 }

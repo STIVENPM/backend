@@ -5,7 +5,6 @@ import com.lavarapido.backend_vehicular.marcas.dto.MarcaRequestDTO;
 import com.lavarapido.backend_vehicular.marcas.dto.MarcaResponseDTO;
 import com.lavarapido.backend_vehicular.marcas.service.MarcaService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,10 +13,11 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/marcas")
-@RequiredArgsConstructor
 public class MarcaController {
 
     private final MarcaService marcaService;
+
+    public MarcaController(MarcaService marcaService) { this.marcaService = marcaService; }
 
     // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
     @PostMapping

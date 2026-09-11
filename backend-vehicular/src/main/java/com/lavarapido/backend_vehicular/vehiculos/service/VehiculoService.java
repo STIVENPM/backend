@@ -10,7 +10,6 @@ import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoRequestDTO;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoResponseDTO;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,13 +18,13 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class VehiculoService {
 
     private final VehiculoRepository vehiculoRepository;
     private final MarcaRepository marcaRepository;
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
+    public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository, UserRepository userRepository, UserRoleRepository userRoleRepository) { this.vehiculoRepository=vehiculoRepository; this.marcaRepository=marcaRepository; this.userRepository=userRepository; this.userRoleRepository=userRoleRepository; }
 
     // ── CREAR ──────────────────────────────────────────────────────
     @Transactional

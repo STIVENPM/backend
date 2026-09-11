@@ -5,7 +5,6 @@ import com.lavarapido.backend_vehicular.marcas.dto.MarcaRequestDTO;
 import com.lavarapido.backend_vehicular.marcas.dto.MarcaResponseDTO;
 import com.lavarapido.backend_vehicular.marcas.entity.Marca;
 import com.lavarapido.backend_vehicular.marcas.repository.MarcaRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,10 +12,11 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class MarcaService {
 
     private final MarcaRepository marcaRepository;
+
+    public MarcaService(MarcaRepository marcaRepository) { this.marcaRepository = marcaRepository; }
 
     // ── CREAR (admin — marca nace ya aprobada) ────────────────────
     @Transactional

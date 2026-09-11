@@ -20,14 +20,14 @@ import com.lavarapido.backend_vehicular.servicios.dto.ServicioResponseDTO;
 import com.lavarapido.backend_vehicular.servicios.service.ServicioService;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/servicios")
-@RequiredArgsConstructor
 public class ServicioController {
 
     private final ServicioService servicioService;
+
+    public ServicioController(ServicioService servicioService) { this.servicioService = servicioService; }
 
     @PostMapping
     public ResponseEntity<ServicioResponseDTO> crear(@Valid @RequestBody ServicioRequestDTO request) {

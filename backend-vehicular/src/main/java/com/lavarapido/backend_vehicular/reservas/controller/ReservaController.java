@@ -5,7 +5,6 @@ import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.service.ReservaService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,10 +21,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/reservas")
-@RequiredArgsConstructor
 public class ReservaController {
 
     private final ReservaService reservaService;
+    public ReservaController(ReservaService reservaService) { this.reservaService = reservaService; }
 
     @PostMapping
     public ResponseEntity<ReservaResponseDTO> crear(@Valid @RequestBody ReservaRequestDTO request) {

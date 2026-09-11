@@ -7,11 +7,6 @@ import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,11 +23,6 @@ import java.util.UUID;
         @Index(name = "idx_reservas_fecha_estado", columnList = "fecha_reserva, estado")
     }
 )
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Reserva {
 
     @Id
@@ -68,7 +58,6 @@ public class Reserva {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 15)
-    @Builder.Default
     private EstadoReserva estado = EstadoReserva.PENDIENTE;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -76,6 +65,13 @@ public class Reserva {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    public Reserva() { }
+    public Reserva(UUID idReserva, User usuario, Vehiculo vehiculo, Servicio servicio, LocalDate fechaReserva, LocalTime horaReserva, LocalDateTime fechaHoraInicio, LocalDateTime fechaHoraFin, EstadoReserva estado, LocalDateTime createdAt, LocalDateTime updatedAt) { this.idReserva=idReserva;this.usuario=usuario;this.vehiculo=vehiculo;this.servicio=servicio;this.fechaReserva=fechaReserva;this.horaReserva=horaReserva;this.fechaHoraInicio=fechaHoraInicio;this.fechaHoraFin=fechaHoraFin;this.estado=estado;this.createdAt=createdAt;this.updatedAt=updatedAt; }
+    public UUID getIdReserva(){return idReserva;} public void setIdReserva(UUID v){idReserva=v;} public User getUsuario(){return usuario;} public void setUsuario(User v){usuario=v;} public Vehiculo getVehiculo(){return vehiculo;} public void setVehiculo(Vehiculo v){vehiculo=v;} public Servicio getServicio(){return servicio;} public void setServicio(Servicio v){servicio=v;} public LocalDate getFechaReserva(){return fechaReserva;} public void setFechaReserva(LocalDate v){fechaReserva=v;} public LocalTime getHoraReserva(){return horaReserva;} public void setHoraReserva(LocalTime v){horaReserva=v;} public LocalDateTime getFechaHoraInicio(){return fechaHoraInicio;} public void setFechaHoraInicio(LocalDateTime v){fechaHoraInicio=v;} public LocalDateTime getFechaHoraFin(){return fechaHoraFin;} public void setFechaHoraFin(LocalDateTime v){fechaHoraFin=v;} public EstadoReserva getEstado(){return estado;} public void setEstado(EstadoReserva v){estado=v;} public LocalDateTime getCreatedAt(){return createdAt;} public void setCreatedAt(LocalDateTime v){createdAt=v;} public LocalDateTime getUpdatedAt(){return updatedAt;} public void setUpdatedAt(LocalDateTime v){updatedAt=v;}
+    public static Builder builder(){return new Builder();}
+    public static class Builder { private UUID idReserva; private User usuario; private Vehiculo vehiculo; private Servicio servicio; private LocalDate fechaReserva; private LocalTime horaReserva; private LocalDateTime fechaHoraInicio; private LocalDateTime fechaHoraFin; private EstadoReserva estado=EstadoReserva.PENDIENTE; private LocalDateTime createdAt; private LocalDateTime updatedAt;
+        public Builder idReserva(UUID v){idReserva=v;return this;} public Builder usuario(User v){usuario=v;return this;} public Builder vehiculo(Vehiculo v){vehiculo=v;return this;} public Builder servicio(Servicio v){servicio=v;return this;} public Builder fechaReserva(LocalDate v){fechaReserva=v;return this;} public Builder horaReserva(LocalTime v){horaReserva=v;return this;} public Builder fechaHoraInicio(LocalDateTime v){fechaHoraInicio=v;return this;} public Builder fechaHoraFin(LocalDateTime v){fechaHoraFin=v;return this;} public Builder estado(EstadoReserva v){estado=v;return this;} public Builder createdAt(LocalDateTime v){createdAt=v;return this;} public Builder updatedAt(LocalDateTime v){updatedAt=v;return this;} public Reserva build(){return new Reserva(idReserva,usuario,vehiculo,servicio,fechaReserva,horaReserva,fechaHoraInicio,fechaHoraFin,estado,createdAt,updatedAt);} }
 
     @PrePersist
     protected void onCreate() {

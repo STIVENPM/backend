@@ -8,15 +8,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class ServicioRequestDTO {
 
     @NotBlank(message = "El nombre es obligatorio")
@@ -34,4 +26,10 @@ public class ServicioRequestDTO {
     @Min(value = 15, message = "La duracion minima es 15 minutos")
     @Max(value = 180, message = "La duracion maxima es 180 minutos")
     private Integer duracionMinutos;
+    public ServicioRequestDTO() { }
+    public ServicioRequestDTO(String nombre, String descripcion, BigDecimal precio, Integer duracionMinutos) { this.nombre=nombre; this.descripcion=descripcion; this.precio=precio; this.duracionMinutos=duracionMinutos; }
+    public String getNombre() { return nombre; } public void setNombre(String value) { nombre=value; }
+    public String getDescripcion() { return descripcion; } public void setDescripcion(String value) { descripcion=value; }
+    public BigDecimal getPrecio() { return precio; } public void setPrecio(BigDecimal value) { precio=value; }
+    public Integer getDuracionMinutos() { return duracionMinutos; } public void setDuracionMinutos(Integer value) { duracionMinutos=value; }
 }

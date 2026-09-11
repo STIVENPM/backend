@@ -13,5 +13,7 @@ public interface AsignacionRepository extends JpaRepository<Asignacion, UUID> {
 
     Optional<Asignacion> findByReserva_IdReserva(UUID idReserva);
 
+    List<Asignacion> findByReserva_IdReservaIn(List<UUID> idReservas);
+
     List<Asignacion> findByOperador_IdOperadorOrderByFechaAsignacionDesc(UUID idOperador);
 }

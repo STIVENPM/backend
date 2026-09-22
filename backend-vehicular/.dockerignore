@@ -1,0 +1,13 @@
+.git
+.gitignore
+.idea
+.vscode
+.mvn/wrapper/maven-wrapper.jar
+target
+*.log
+.env
+application-local.properties
+application-wompi-local.properties
+BACKEND_STATUS.md
+WOMPI_FRONTEND_CONTRACT.md
+WOMPI_LOCAL_DIAGNOSTICO.md

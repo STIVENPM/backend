@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "wompi")
 public class WompiProperties {
     private String publicKey;
-    /** Reserved for a future direct-API integration. It is deliberately unused by the Widget flow. */
+    /** Used only for server-side transaction status queries, never for creating charges. */
     private String privateKey;
     private String environment;
     private String integritySecret;

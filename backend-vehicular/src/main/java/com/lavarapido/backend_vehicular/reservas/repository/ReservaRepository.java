@@ -3,6 +3,7 @@ package com.lavarapido.backend_vehicular.reservas.repository;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,8 +11,14 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reserva r where r.idReserva = :idReserva")
+    Optional<Reserva> findByIdForUpdate(@Param("idReserva") UUID idReserva);
 
     List<Reserva> findByUsuario_UserId(UUID usuarioId);
 

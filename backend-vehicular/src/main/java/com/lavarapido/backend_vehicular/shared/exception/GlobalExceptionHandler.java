@@ -3,6 +3,9 @@ package com.lavarapido.backend_vehicular.shared.exception;
 import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
 import com.lavarapido.backend_vehicular.auth.exception.UserNotFoundException;
 import com.lavarapido.backend_vehicular.pagos.exception.WompiConfiguracionException;
+import com.lavarapido.backend_vehicular.pagos.exception.PagoConflictException;
+import com.lavarapido.backend_vehicular.pagos.exception.WompiEventoInvalidoException;
+import com.lavarapido.backend_vehicular.pagos.exception.WompiProveedorException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +53,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleWompiConfiguracion(WompiConfiguracionException exception) {
         logger.error("Error de configuración de Wompi", exception);
         return response(HttpStatus.INTERNAL_SERVER_ERROR, "Error de configuración del servicio de pagos");
+    }
+
+    @ExceptionHandler(PagoConflictException.class)
+    public ResponseEntity<Map<String, String>> handlePagoConflict(PagoConflictException exception) {
+        return response(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(WompiEventoInvalidoException.class)
+    public ResponseEntity<Map<String, String>> handleWompiEventoInvalido(WompiEventoInvalidoException exception) {
+        logger.warn("Evento o transaccion Wompi rechazado: {}", exception.getMessage());
+        return response(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage());
+    }
+
+    @ExceptionHandler(WompiProveedorException.class)
+    public ResponseEntity<Map<String, String>> handleWompiProveedor(WompiProveedorException exception) {
+        logger.error("Error consultando Wompi", exception);
+        return response(HttpStatus.BAD_GATEWAY, "No fue posible consultar el estado en Wompi");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

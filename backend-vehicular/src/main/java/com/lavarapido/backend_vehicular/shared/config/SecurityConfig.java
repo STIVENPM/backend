@@ -291,6 +291,12 @@ public class SecurityConfig {
                     "/api/asignaciones/**"
                 ).hasRole("OPERATOR")
 
+                // La reconciliacion usa la llave privada y solo puede ejecutarla ADMIN.
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/pagos/reserva/*/reconciliar"
+                ).hasRole("ADMIN")
+
 
                 // =====================================================
                 // CUALQUIER OTRO ENDPOINT

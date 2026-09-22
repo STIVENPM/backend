@@ -26,12 +26,6 @@ public class Pago {
     @Builder.Default
     private String metodoPago = "online";
 
-    @Column(name = "referencia_pago", length = 100)
-    private String referenciaPago;
-
-    @Column(name = "estado_wompi", length = 15)
-    private String estadoWompi;
-
     @Column(name = "monto", nullable = false, precision = 12, scale = 0)
     private BigDecimal monto;
 

@@ -1,6 +1,7 @@
 package com.lavarapido.backend_vehicular.pagos.service;
 
 import com.lavarapido.backend_vehicular.pagos.config.WompiProperties;
+import com.lavarapido.backend_vehicular.pagos.config.WompiConfigurationService;
 import com.lavarapido.backend_vehicular.pagos.exception.WompiConfiguracionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,8 +28,9 @@ class WompiSignatureServiceTest {
     @BeforeEach
     void setUp() {
         properties = new WompiProperties();
-        properties.setEventsSecret(SECRET);
-        service = new WompiSignatureService(properties);
+        properties.setEnvironment("sandbox");
+        properties.setEventsSecret("test_events_" + SECRET);
+        service = new WompiSignatureService(properties, new WompiConfigurationService(properties));
     }
 
     @Test
@@ -41,7 +43,7 @@ class WompiSignatureServiceTest {
     @Test
     void firmaWebhookValida_aceptaChecksumEnMayusculasCuandoSeUsaHeader() throws Exception {
         JsonNode evento = construirEvento("abc123", "approved", "1700");
-        String checksumMayusculas = construirChecksum("abc123", "approved", "1700", SECRET).toUpperCase();
+        String checksumMayusculas = construirChecksum("abc123", "approved", "1700", properties.getEventsSecret()).toUpperCase();
 
         assertTrue(service.firmaWebhookValida(evento, checksumMayusculas));
     }
@@ -56,7 +58,7 @@ class WompiSignatureServiceTest {
     @Test
     void firmaWebhookValida_lanzaConfiguracionExceptionCuandoFaltaSecret() throws Exception {
         properties.setEventsSecret("   ");
-        service = new WompiSignatureService(properties);
+        service = new WompiSignatureService(properties, new WompiConfigurationService(properties));
 
         JsonNode evento = construirEvento("abc123", "approved", "1700");
 
@@ -69,7 +71,7 @@ class WompiSignatureServiceTest {
 
         ObjectNode signature = evento.putObject("signature");
         signature.putArray("properties").add("id").add("status");
-        signature.put("checksum", construirChecksum(id, status, timestamp, SECRET));
+        signature.put("checksum", construirChecksum(id, status, timestamp, properties.getEventsSecret()));
 
         ObjectNode data = evento.putObject("data");
         data.put("id", id);

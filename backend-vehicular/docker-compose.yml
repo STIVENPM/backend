@@ -1,0 +1,32 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lava-rapido-backend:local
+    container_name: lava-rapido-backend
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: "8081"
+      DB_HOST: ${DB_HOST:-lavarapido-base-datos-postgres-1}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-lavarapido_db}
+      DB_USERNAME: ${DB_USERNAME:-lavarapido_user}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD before starting the backend}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before starting the backend}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      WOMPI_ENVIRONMENT: ${WOMPI_ENVIRONMENT:-sandbox}
+      WOMPI_PUBLIC_KEY: ${WOMPI_PUBLIC_KEY:-}
+      WOMPI_PRIVATE_KEY: ${WOMPI_PRIVATE_KEY:-}
+      WOMPI_INTEGRITY_SECRET: ${WOMPI_INTEGRITY_SECRET:-}
+      WOMPI_EVENTS_SECRET: ${WOMPI_EVENTS_SECRET:-}
+    networks:
+      - lavarapido_database
+
+networks:
+  lavarapido_database:
+    external: true
+    name: lavarapido-base-datos_default

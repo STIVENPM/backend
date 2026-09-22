@@ -22,12 +22,18 @@ public class PagoController {
 
     @PostMapping("/reserva/{idReserva}")
     public ResponseEntity<PagoWidgetResponseDTO> iniciar(@PathVariable UUID idReserva) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(pagoService.iniciar(idReserva));
+        PagoWidgetResponseDTO response = pagoService.iniciar(idReserva);
+        return ResponseEntity.status(response.reutilizado() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/reserva/{idReserva}")
     public ResponseEntity<PagoResponseDTO> obtenerPorReserva(@PathVariable UUID idReserva) {
         return ResponseEntity.ok(pagoService.obtenerPorReserva(idReserva));
+    }
+
+    @PostMapping("/reserva/{idReserva}/reconciliar")
+    public ResponseEntity<PagoResponseDTO> reconciliar(@PathVariable UUID idReserva) {
+        return ResponseEntity.ok(pagoService.reconciliar(idReserva));
     }
 
     @PostMapping("/webhook")
@@ -38,7 +44,8 @@ public class PagoController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         log.info("Webhook Wompi con firma válida recibido: evento={}", evento.path("event").asString());
-        pagoService.procesarEvento(evento);
+        PagoService.ResultadoEvento resultado = pagoService.procesarEvento(evento);
+        log.info("Webhook Wompi atendido: resultado={}", resultado);
         return ResponseEntity.ok().build();
     }
 }

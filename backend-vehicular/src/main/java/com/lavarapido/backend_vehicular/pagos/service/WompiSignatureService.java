@@ -2,6 +2,7 @@ package com.lavarapido.backend_vehicular.pagos.service;
 
 import tools.jackson.databind.JsonNode;
 import com.lavarapido.backend_vehicular.pagos.config.WompiProperties;
+import com.lavarapido.backend_vehicular.pagos.config.WompiConfigurationService;
 import com.lavarapido.backend_vehicular.pagos.exception.WompiConfiguracionException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -18,12 +19,15 @@ import java.util.Locale;
 public class WompiSignatureService {
     private static final Logger logger = LoggerFactory.getLogger(WompiSignatureService.class);
     private final WompiProperties properties;
+    private final WompiConfigurationService configurationService;
 
     public String crearFirmaIntegridad(String referencia, long montoEnCentavos, String moneda) {
+        configurationService.validarWidget();
         return sha256(referencia + montoEnCentavos + moneda + requiredSecret(properties.getIntegritySecret(), "integridad"));
     }
 
     public boolean firmaWebhookValida(JsonNode evento, String checksumHeader) {
+        configurationService.validarEventos();
         JsonNode signature = evento.path("signature");
         JsonNode propertyNames = signature.path("properties");
         String recibido = checksumHeader != null && !checksumHeader.isBlank()

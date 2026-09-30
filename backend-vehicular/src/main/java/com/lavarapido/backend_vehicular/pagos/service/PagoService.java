@@ -159,6 +159,32 @@ public class PagoService {
         return response(pago);
     }
 
+    @Transactional
+    public PagoResponseDTO verificar(UUID idReserva, String referencia, String transactionId) {
+        if (referencia == null || referencia.isBlank() || referencia.length() > 100
+                || transactionId == null || transactionId.isBlank() || transactionId.length() > 100) {
+            throw new IllegalArgumentException("Referencia o identificador de transaccion no valido");
+        }
+        Pago pago = pagoRepository.findByReserva_IdReserva(idReserva)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Pago no encontrado para la reserva"));
+        validarPropietarioOAdmin(pago.getReserva(), obtenerUsuarioAutenticado());
+        intentoRepository.findByReferenciaAndPago_IdPago(referencia, pago.getIdPago())
+                .orElseThrow(() -> new RecursoNoEncontradoException("Intento de pago no encontrado"));
+
+        JsonNode transaction = transactionClient.consultar(transactionId);
+        TransaccionWompi datos = leerTransaccion(transaction);
+        if (!transactionId.equals(datos.id()) || !referencia.equals(datos.referencia())) {
+            throw new WompiEventoInvalidoException("La transaccion consultada no coincide con el intento local");
+        }
+        PagoIntento intento = intentoRepository.findByReferenciaForUpdate(referencia)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Intento de pago no encontrado"));
+        if (!intento.getPago().getIdPago().equals(pago.getIdPago())) {
+            throw new AccessDeniedException("El intento no pertenece a esta reserva");
+        }
+        aplicarTransaccion(intento, datos, configurationService.ambienteEventoEsperado());
+        return response(pago);
+    }
+
     private ResultadoEvento procesarTransaccion(JsonNode transaction, String ambiente) {
         TransaccionWompi datos = leerTransaccion(transaction);
         PagoIntento intento = intentoRepository.findByReferenciaForUpdate(datos.referencia())

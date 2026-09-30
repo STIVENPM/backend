@@ -18,6 +18,7 @@ import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
 import com.lavarapido.backend_vehicular.roles.entity.Role;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
+import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.entity.UserRole;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
@@ -290,6 +291,44 @@ class PagoServiceTest {
         assertThrows(WompiProveedorException.class, () -> service.reconciliar(RESERVA_ID));
         assertEquals(EstadoIntentoPago.pendiente, intento.getEstado());
         assertEquals(EstadoPago.pendiente, pago.getEstado());
+    }
+
+    @Test
+    void verificacionDesdeWidgetConsultaWompiAntesDeAprobar() {
+        when(pagoRepository.findByReserva_IdReserva(RESERVA_ID)).thenReturn(Optional.of(pago));
+        when(intentoRepository.findByReferenciaAndPago_IdPago(REFERENCIA, PAGO_ID)).thenReturn(Optional.of(intento));
+        when(transactionClient.consultar("tx-1"))
+                .thenReturn(transaccion("APPROVED", "CARD", 3_500_000, "COP"));
+        when(intentoRepository.findByPago_IdPagoOrderByCreatedAtAsc(PAGO_ID)).thenReturn(List.of(intento));
+
+        PagoResponseDTO response = service.verificar(RESERVA_ID, REFERENCIA, "tx-1");
+
+        assertEquals("aprobado", response.estado());
+        assertEquals("tx-1", intento.getWompiTransactionId());
+        assertEquals("CARD", intento.getWompiPaymentMethodType());
+    }
+
+    @Test
+    void verificacionRechazaReferenciaDistintaSinPersistir() {
+        when(pagoRepository.findByReserva_IdReserva(RESERVA_ID)).thenReturn(Optional.of(pago));
+
+        assertThrows(RecursoNoEncontradoException.class,
+                () -> service.verificar(RESERVA_ID, "PAGO-falsa", "tx-1"));
+        assertEquals(EstadoPago.pendiente, pago.getEstado());
+        verifyNoInteractions(transactionClient);
+        verify(intentoRepository, never()).findByReferenciaForUpdate(any());
+    }
+
+    @Test
+    void verificacionNoConsultaWompiParaReservaAjena() {
+        User otro = new User();
+        otro.setUserId(UUID.randomUUID());
+        reserva.setUsuario(otro);
+        when(pagoRepository.findByReserva_IdReserva(RESERVA_ID)).thenReturn(Optional.of(pago));
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.verificar(RESERVA_ID, REFERENCIA, "tx-1"));
+        verifyNoInteractions(transactionClient);
     }
 
     private void autenticarAdmin() {

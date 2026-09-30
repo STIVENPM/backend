@@ -36,6 +36,12 @@ public class PagoController {
         return ResponseEntity.ok(pagoService.reconciliar(idReserva));
     }
 
+    @PostMapping("/reserva/{idReserva}/verificar")
+    public ResponseEntity<PagoResponseDTO> verificar(@PathVariable UUID idReserva,
+                                                      @RequestBody VerificarTransaccionRequest request) {
+        return ResponseEntity.ok(pagoService.verificar(idReserva, request.referencia(), request.transactionId()));
+    }
+
     @PostMapping("/webhook")
     public ResponseEntity<Void> webhook(@RequestBody JsonNode evento,
                                         @RequestHeader(value = "X-Event-Checksum", required = false) String checksum) {
@@ -48,4 +54,6 @@ public class PagoController {
         log.info("Webhook Wompi atendido: resultado={}", resultado);
         return ResponseEntity.ok().build();
     }
+
+    public record VerificarTransaccionRequest(String referencia, String transactionId) { }
 }

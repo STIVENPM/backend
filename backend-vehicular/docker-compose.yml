@@ -10,7 +10,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: "8081"
-      DB_HOST: ${DB_HOST:-lavarapido-base-datos-postgres-1}
+      DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-lavarapido_db}
       DB_USERNAME: ${DB_USERNAME:-lavarapido_user}

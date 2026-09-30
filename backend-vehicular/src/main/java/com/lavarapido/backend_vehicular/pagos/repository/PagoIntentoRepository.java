@@ -13,6 +13,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface PagoIntentoRepository extends JpaRepository<PagoIntento, UUID> {
+    Optional<PagoIntento> findByReferenciaAndPago_IdPago(String referencia, UUID idPago);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from PagoIntento i join fetch i.pago p join fetch p.reserva where i.referencia = :referencia")
     Optional<PagoIntento> findByReferenciaForUpdate(@Param("referencia") String referencia);

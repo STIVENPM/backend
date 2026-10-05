@@ -5,8 +5,7 @@ import com.lavarapido.backend_vehicular.operadores.entity.Operador;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.Convert;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -50,7 +49,7 @@ public class Asignacion {
     @Column(name = "fecha_asignacion", nullable = false)
     private LocalDateTime fechaAsignacion;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EstadoAsignacionConverter.class)
     @Column(name = "estado", nullable = false, length = 15)
     @Builder.Default
     private EstadoAsignacion estado = EstadoAsignacion.asignada;

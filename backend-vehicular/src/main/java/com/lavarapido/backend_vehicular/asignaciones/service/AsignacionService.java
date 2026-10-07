@@ -336,10 +336,10 @@ public class AsignacionService {
                 reserva.getServicio().getDescripcion();
 
         BigDecimal precioServicio =
-                reserva.getServicio().getPrecio();
+                reserva.getPrecioPactado();
 
         Integer duracionMinutos =
-                reserva.getServicio().getDuracionMinutos();
+                reserva.getDuracionMinutosPactada();
 
         // =====================================================
         // RESPONSE

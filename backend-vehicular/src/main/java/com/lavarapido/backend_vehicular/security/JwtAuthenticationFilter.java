@@ -16,12 +16,15 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import org.springframework.security.core.AuthenticationException;
+import com.lavarapido.backend_vehicular.users.entity.User;
 
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AccountAccessService accountAccessService;
 
     @Override
     protected void doFilterInternal(
@@ -57,7 +60,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Extraer información del JWT
         String email = jwtService.extractEmail(token);
-        String role = jwtService.extractRole(token);
+        // The signed token identifies the account; its old role claim is never trusted.
+        final User user;
+        final String role;
+        try {
+            user = accountAccessService.activeUser(email);
+            role = accountAccessService.currentRole(user);
+        } catch (AuthenticationException exception) {
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Sesion invalida");
+            return;
+        }
 
         // Crear la autoridad que espera Spring Security.
         // hasRole("ADMIN") internamente busca ROLE_ADMIN.

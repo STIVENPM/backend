@@ -12,7 +12,7 @@ RUN chmod +x mvnw \
 
 COPY src src
 
-RUN ./mvnw -B -DskipTests package
+RUN ./mvnw -B test package
 
 
 FROM eclipse-temurin:17-jre-jammy
@@ -21,6 +21,8 @@ WORKDIR /app
 
 COPY --from=build /workspace/target/*.jar app.jar
 
-EXPOSE 8081
+ENV SPRING_PROFILES_ACTIVE=prod
+
+EXPOSE 10000
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

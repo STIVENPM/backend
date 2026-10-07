@@ -33,12 +33,11 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     @Query(value = """
             SELECT r.*
             FROM reservas r
-            JOIN servicios s ON s.id_servicio = r.fk_id_servicio
             WHERE r.fk_id_vehiculo = :idVehiculo
               AND r.fecha_reserva = :fechaReserva
               AND r.estado <> :estadoCancelada
               AND r.hora_reserva < :horaFin
-              AND :horaInicio < r.hora_reserva + (s.duracion_minutos * INTERVAL '1 minute')
+              AND :horaInicio < r.hora_reserva + (r.duracion_minutos_pactada * INTERVAL '1 minute')
             """, nativeQuery = true)
     List<Reserva> findSolapamientosPorVehiculo(
             @Param("idVehiculo") UUID idVehiculo,

@@ -2,15 +2,19 @@ package com.lavarapido.backend_vehicular.users.service;
 
 import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
 import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
+import com.lavarapido.backend_vehicular.auth.service.PasswordRules;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.security.JwtService;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserSessionDTO;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
-import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,20 +28,22 @@ public class UserService {
 
     private final JwtService jwtService;
 
-    private final UserRoleRepository userRoleRepository;
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, UserRoleRepository userRoleRepository) { this.userRepository=userRepository; this.passwordEncoder=passwordEncoder; this.jwtService=jwtService; this.userRoleRepository=userRoleRepository; }
+    private final AccountAccessService accountAccessService;
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, AccountAccessService accountAccessService) { this.userRepository=userRepository; this.passwordEncoder=passwordEncoder; this.jwtService=jwtService; this.accountAccessService=accountAccessService; }
 
     // 🔥 REGISTRO DE USUARIO
     // @Transactional garantiza que si ocurre un error durante el proceso,
     // toda la operacion se revierte automaticamente (rollback)
     // evitando registros incompletos o inconsistentes en base de datos
     @Transactional
-    public User registerUser(UserRegistrationDTO dto) {
+    public UserRegistrationResponseDTO registerUser(UserRegistrationDTO dto) {
+
+        PasswordRules.requireValid(dto.getPassword());
 
         // verifica disponibilidad del correo para evitar duplicados
         // antes de intentar guardar en la base de datos
         if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("el correo ya esta registrado");
+            throw new IllegalStateException("El correo ya esta registrado");
         }
 
         // se crea una nueva instancia de la entidad User
@@ -63,19 +69,18 @@ public class UserService {
         // guarda el usuario en la base de datos
         // Hibernate genera el UUID automaticamente y retorna
         // el objeto persistido con sus datos completos
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        return new UserRegistrationResponseDTO(saved.getUserId(), saved.getFirstName(), saved.getEmail());
     }
 
 // 🔐 LOGIN DE USUARIO
 public LoginResponseDTO login(LoginDTO dto) {
 
-    var userOpt = userRepository.findByEmail(dto.getEmail());
-
-    if (userOpt.isEmpty()) {
-        throw new RuntimeException("Usuario no encontrado");
+    User user = userRepository.findByEmail(dto.getEmail())
+            .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
+    if (!Boolean.TRUE.equals(user.getStatus())) {
+        throw new BadCredentialsException("Credenciales incorrectas");
     }
-
-    User user = userOpt.get();
 
     boolean valid = passwordEncoder.matches(
         dto.getPassword(),
@@ -83,18 +88,12 @@ public LoginResponseDTO login(LoginDTO dto) {
     );
 
     if (!valid) {
-        throw new RuntimeException("Contrasena incorrecta");
+        throw new BadCredentialsException("Credenciales incorrectas");
     }
 
-    var userRoleOpt = userRoleRepository
-            .findActiveRoleByUserId(user.getUserId());
+    String roleName = accountAccessService.currentRole(user);
 
-    String roleName = userRoleOpt
-            .map(ur -> ur.getRole().getRoleName())
-            .orElse("USER");
-
-    // ← MODIFICADO: ahora se pasa el rol como segundo argumento
-    String token = jwtService.generateToken(user.getEmail(), roleName);
+    String token = jwtService.generateToken(user.getEmail());
 
     LoginResponseDTO.UserInfoDTO info =
             new LoginResponseDTO.UserInfoDTO(
@@ -107,18 +106,23 @@ public LoginResponseDTO login(LoginDTO dto) {
     return new LoginResponseDTO(token, info);
 }
 
+    public UserSessionDTO getSession() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = accountAccessService.activeUser(email);
+        return new UserSessionDTO(user.getUserId(), user.getFirstName(), user.getEmail(),
+                accountAccessService.currentRole(user));
+    }
+
     public UserProfileResponseDTO getProfile() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario autenticado no encontrado"));
+        User user = accountAccessService.activeUser(email);
         return UserProfileResponseDTO.from(user);
     }
 
     @Transactional
     public UserProfileResponseDTO updateProfile(UserProfileUpdateDTO dto) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario autenticado no encontrado"));
+        User user = accountAccessService.activeUser(email);
 
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());

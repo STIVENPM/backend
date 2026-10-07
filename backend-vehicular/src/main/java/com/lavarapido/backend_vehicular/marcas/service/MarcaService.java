@@ -5,6 +5,7 @@ import com.lavarapido.backend_vehicular.marcas.dto.MarcaRequestDTO;
 import com.lavarapido.backend_vehicular.marcas.dto.MarcaResponseDTO;
 import com.lavarapido.backend_vehicular.marcas.entity.Marca;
 import com.lavarapido.backend_vehicular.marcas.repository.MarcaRepository;
+import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +26,7 @@ public class MarcaService {
         String nombreNormalizado = dto.nombre().trim().toUpperCase();
 
         if (marcaRepository.existsByNombreIgnoreCase(nombreNormalizado)) {
-            throw new RuntimeException("Ya existe una marca con ese nombre");
+            throw new IllegalStateException("Ya existe una marca con ese nombre");
         }
 
         Marca marca = new Marca();
@@ -84,7 +85,7 @@ public class MarcaService {
         // Si cambió el nombre, valida que no choque con otra marca existente.
         if (!nombreNormalizado.equals(marca.getNombre())
                 && marcaRepository.existsByNombreIgnoreCase(nombreNormalizado)) {
-            throw new RuntimeException("Ya existe una marca con ese nombre");
+            throw new IllegalStateException("Ya existe una marca con ese nombre");
         }
 
         marca.setNombre(nombreNormalizado);
@@ -106,7 +107,7 @@ public class MarcaService {
 
     private Marca buscarMarcaOrThrow(UUID idMarca) {
         return marcaRepository.findById(idMarca)
-            .orElseThrow(() -> new RuntimeException("Marca no encontrada"));
+            .orElseThrow(() -> new RecursoNoEncontradoException("Marca no encontrada"));
     }
 
     private MarcaResponseDTO mapearAResponse(Marca marca) {

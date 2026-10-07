@@ -15,7 +15,7 @@ import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
-import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
 import org.springframework.security.core.Authentication;
@@ -37,17 +37,17 @@ public class ReservaService {
 
     private final ReservaRepository reservaRepository;
     private final UserRepository userRepository;
-    private final UserRoleRepository userRoleRepository;
+    private final AccountAccessService accountAccessService;
     private final VehiculoRepository vehiculoRepository;
     private final ServicioRepository servicioRepository;
     private final AsignacionRepository asignacionRepository;
-    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, UserRoleRepository userRoleRepository, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.userRoleRepository=userRoleRepository; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; }
+    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; }
 
     @Transactional
     public ReservaResponseDTO crear(ReservaRequestDTO request) {
         User usuario = obtenerUsuarioAutenticado();
 
-        Vehiculo vehiculo = vehiculoRepository.findById(request.getFkIdVehiculo())
+        Vehiculo vehiculo = vehiculoRepository.findByIdForUpdate(request.getFkIdVehiculo())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Vehículo no encontrado"));
 
         Servicio servicio = servicioRepository.findById(request.getFkIdServicio())
@@ -80,6 +80,8 @@ public class ReservaService {
                 .servicio(servicio)
                 .fechaReserva(request.getFechaReserva())
                 .horaReserva(request.getHoraReserva())
+                .precioPactado(servicio.getPrecio())
+                .duracionMinutosPactada(servicio.getDuracionMinutos())
                 .estado(EstadoReserva.PENDIENTE)
                 .build();
 
@@ -198,14 +200,11 @@ public class ReservaService {
             throw new IllegalArgumentException("Usuario no autenticado");
         }
 
-        return userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario autenticado no encontrado"));
+        return accountAccessService.activeUser(authentication.getName());
     }
 
     private boolean esAdmin(User usuario) {
-        return userRoleRepository.findActiveRoleByUserId(usuario.getUserId())
-                .map(userRole -> "ADMIN".equals(userRole.getRole().getRoleName()))
-                .orElse(false);
+        return "ADMIN".equals(accountAccessService.currentRole(usuario));
     }
 
     private void validarPropietarioOAdmin(Reserva reserva, User usuarioAutenticado) {
@@ -268,8 +267,8 @@ public class ReservaService {
                 servicio.getIdServicio(),
                 servicio.getNombre(),
                 servicio.getDescripcion(),
-                servicio.getPrecio(),
-                servicio.getDuracionMinutos(),
+                reserva.getPrecioPactado(),
+                reserva.getDuracionMinutosPactada(),
                 reserva.getFechaReserva(),
                 reserva.getHoraReserva(),
                 reserva.getFechaHoraInicio(),

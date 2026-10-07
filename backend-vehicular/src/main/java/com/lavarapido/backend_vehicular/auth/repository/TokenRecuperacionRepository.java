@@ -1,7 +1,9 @@
 package com.lavarapido.backend_vehicular.auth.repository;
 
 import com.lavarapido.backend_vehicular.auth.entity.TokenRecuperacion;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -9,6 +11,7 @@ import java.util.UUID;
 public interface TokenRecuperacionRepository extends JpaRepository<TokenRecuperacion, UUID> {
 
     // Busca un token por su hash para validarlo cuando el usuario hace clic en el enlace
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<TokenRecuperacion> findByTokenHash(String tokenHash);
 
     // Verifica si un usuario ya tiene tokens activos (no usados y no expirados)

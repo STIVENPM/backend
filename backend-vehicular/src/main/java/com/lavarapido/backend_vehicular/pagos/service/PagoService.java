@@ -18,8 +18,7 @@ import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
-import com.lavarapido.backend_vehicular.users.repository.UserRepository;
-import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,8 +46,7 @@ public class PagoService {
     private final PagoRepository pagoRepository;
     private final PagoIntentoRepository intentoRepository;
     private final ReservaRepository reservaRepository;
-    private final UserRepository userRepository;
-    private final UserRoleRepository userRoleRepository;
+    private final AccountAccessService accountAccessService;
     private final WompiProperties wompiProperties;
     private final WompiConfigurationService configurationService;
     private final WompiSignatureService signatureService;
@@ -67,7 +65,7 @@ public class PagoService {
             throw new PagoConflictException("Solo se puede pagar una reserva en estado PENDIENTE");
         }
 
-        BigDecimal monto = validarMonto(reserva.getServicio().getPrecio());
+        BigDecimal monto = validarMonto(reserva.getPrecioPactado());
         Pago pago = pagoRepository.findByReservaIdForUpdate(idReserva).orElseGet(() ->
                 pagoRepository.save(Pago.builder()
                         .reserva(reserva)
@@ -77,7 +75,7 @@ public class PagoService {
                         .build()));
 
         if (pago.getMonto().compareTo(monto) != 0) {
-            throw new PagoConflictException("El precio actual no coincide con el monto fijado para el pago");
+            throw new PagoConflictException("El precio pactado no coincide con el monto fijado para el pago");
         }
         if (pago.getEstado() == EstadoPago.aprobado) {
             throw new PagoConflictException("La reserva ya tiene un pago aprobado");
@@ -381,8 +379,7 @@ public class PagoService {
         if (auth == null || auth.getName() == null) {
             throw new IllegalArgumentException("Usuario no autenticado");
         }
-        return userRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RecursoNoEncontradoException("Usuario autenticado no encontrado"));
+        return accountAccessService.activeUser(auth.getName());
     }
 
     private void validarPropietarioOAdmin(Reserva reserva, User usuario) {
@@ -392,8 +389,7 @@ public class PagoService {
     }
 
     private boolean esAdmin(User usuario) {
-        return userRoleRepository.findActiveRoleByUserId(usuario.getUserId())
-                .map(ur -> "ADMIN".equals(ur.getRole().getRoleName())).orElse(false);
+        return "ADMIN".equals(accountAccessService.currentRole(usuario));
     }
 
     private record TransaccionWompi(

@@ -1,10 +1,14 @@
 package com.lavarapido.backend_vehicular.auth.controller;
 
 import com.lavarapido.backend_vehicular.auth.service.PasswordResetService;
+import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class PasswordResetController {
 
     private final PasswordResetService passwordResetService;
+    private static final Logger logger = LoggerFactory.getLogger(PasswordResetController.class);
 
     // ── ENDPOINT 1: El usuario pide recuperar su contraseña ──────────
     /**
@@ -32,7 +37,11 @@ public class PasswordResetController {
         // Captura la IP del solicitante para auditoría
         String ip = httpRequest.getRemoteAddr();
 
-        passwordResetService.solicitarRecuperacion(request.email(), ip);
+        try {
+            passwordResetService.solicitarRecuperacion(request.email(), ip);
+        } catch (EmailDeliveryException exception) {
+            logger.warn("No fue posible enviar el correo de recuperacion ({})", exception.getClass().getSimpleName());
+        }
 
         return ResponseEntity.ok("Si el correo está registrado, recibirás un enlace.");
     }
@@ -46,7 +55,7 @@ public class PasswordResetController {
      */
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(
-            @RequestBody ResetPasswordRequest request) {
+            @Valid @RequestBody ResetPasswordRequest request) {
 
         passwordResetService.resetearContrasena(
             request.token(),
@@ -66,5 +75,7 @@ public class PasswordResetController {
             String email) {}
 
     /** Body del segundo endpoint */
-    record ResetPasswordRequest(String token, String nuevaContrasena) {}
+    record ResetPasswordRequest(
+            @NotBlank String token,
+            @NotBlank @Size(min = 8, max = 72) String nuevaContrasena) {}
 }

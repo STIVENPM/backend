@@ -50,11 +50,19 @@ public class ReservaService {
         Vehiculo vehiculo = vehiculoRepository.findByIdForUpdate(request.getFkIdVehiculo())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Vehículo no encontrado"));
 
-        Servicio servicio = servicioRepository.findById(request.getFkIdServicio())
+        Servicio servicio = servicioRepository.findByIdForUpdate(request.getFkIdServicio())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Servicio no encontrado"));
 
         if (!esAdmin(usuario) && !vehiculo.getUsuario().getUserId().equals(usuario.getUserId())) {
             throw new VehiculoNoPerteneceUsuarioException("El vehículo no pertenece al usuario autenticado");
+        }
+
+        if (!Boolean.TRUE.equals(vehiculo.getEstado())) {
+            throw new IllegalStateException("El vehículo está inactivo y no puede reservarse");
+        }
+
+        if (!Boolean.TRUE.equals(servicio.getEstado())) {
+            throw new IllegalStateException("El servicio está inactivo y no puede reservarse");
         }
 
         validarHoraReserva(request.getHoraReserva());

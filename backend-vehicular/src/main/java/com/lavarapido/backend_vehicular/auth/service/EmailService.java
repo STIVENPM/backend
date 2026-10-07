@@ -37,6 +37,8 @@ public class EmailService {
             "Recibimos una solicitud para restablecer tu contraseña.\n\n" +
             "Haz clic en el siguiente enlace (válido por 30 minutos):\n" +
             enlace + "\n\n" +
+            "Si usas la aplicacion movil, copia este token de un solo uso en la pantalla de recuperacion:\n" +
+            tokenPlano + "\n\n" +
             "Si no solicitaste esto, ignora este correo.\n\n" +
             "– Equipo Lava Rápido Vehicular"
         );

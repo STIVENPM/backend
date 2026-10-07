@@ -4,13 +4,14 @@ package com.lavarapido.backend_vehicular.vehiculos.service;
 import com.lavarapido.backend_vehicular.marcas.entity.Marca;
 import com.lavarapido.backend_vehicular.marcas.repository.MarcaRepository;
 import com.lavarapido.backend_vehicular.users.entity.User;
-import com.lavarapido.backend_vehicular.users.repository.UserRepository;
-import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoRequestDTO;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoResponseDTO;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,9 +23,8 @@ public class VehiculoService {
 
     private final VehiculoRepository vehiculoRepository;
     private final MarcaRepository marcaRepository;
-    private final UserRepository userRepository;
-    private final UserRoleRepository userRoleRepository;
-    public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository, UserRepository userRepository, UserRoleRepository userRoleRepository) { this.vehiculoRepository=vehiculoRepository; this.marcaRepository=marcaRepository; this.userRepository=userRepository; this.userRoleRepository=userRoleRepository; }
+    private final AccountAccessService accountAccessService;
+    public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository, AccountAccessService accountAccessService) { this.vehiculoRepository=vehiculoRepository; this.marcaRepository=marcaRepository; this.accountAccessService=accountAccessService; }
 
     // ── CREAR ──────────────────────────────────────────────────────
     @Transactional
@@ -36,7 +36,7 @@ public class VehiculoService {
         String placaNormalizada = dto.placa().toUpperCase();
 
         if (vehiculoRepository.existsByPlaca(placaNormalizada)) {
-            throw new RuntimeException("Ya existe un vehículo registrado con esa placa");
+            throw new IllegalStateException("Ya existe un vehículo registrado con esa placa");
         }
 
         Marca marca = resolverMarca(dto.fkIdMarca());
@@ -93,7 +93,7 @@ public class VehiculoService {
         // Si cambió la placa, valida que la nueva no choque con otro vehículo.
         if (!placaNormalizada.equals(vehiculo.getPlaca())
                 && vehiculoRepository.existsByPlaca(placaNormalizada)) {
-            throw new RuntimeException("Ya existe un vehículo registrado con esa placa");
+            throw new IllegalStateException("Ya existe un vehículo registrado con esa placa");
         }
 
         Marca marca = resolverMarca(dto.fkIdMarca());
@@ -128,13 +128,12 @@ public class VehiculoService {
      */
     private User obtenerUsuarioAutenticado() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuario autenticado no encontrado"));
+        return accountAccessService.activeUser(email);
     }
 
     private Vehiculo buscarVehiculoOrThrow(UUID idVehiculo) {
         return vehiculoRepository.findById(idVehiculo)
-            .orElseThrow(() -> new RuntimeException("Vehículo no encontrado"));
+            .orElseThrow(() -> new RecursoNoEncontradoException("Vehículo no encontrado"));
     }
 
     /**
@@ -148,12 +147,10 @@ public class VehiculoService {
             return;
         }
 
-        boolean esAdmin = userRoleRepository.findActiveRoleByUserId(usuarioAutenticado.getUserId())
-            .map(ur -> "ADMIN".equals(ur.getRole().getRoleName()))
-            .orElse(false);
+        boolean esAdmin = "ADMIN".equals(accountAccessService.currentRole(usuarioAutenticado));
 
         if (!esAdmin) {
-            throw new RuntimeException("No tienes permiso para modificar este vehículo");
+            throw new AccessDeniedException("No tienes permiso para modificar este vehículo");
         }
     }
 
@@ -165,7 +162,7 @@ public class VehiculoService {
      */
     private Marca resolverMarca(UUID fkIdMarca) {
         return marcaRepository.findById(fkIdMarca)
-            .orElseThrow(() -> new RuntimeException("La marca seleccionada no existe"));
+            .orElseThrow(() -> new RecursoNoEncontradoException("La marca seleccionada no existe"));
     }
 
     private VehiculoResponseDTO mapearAResponse(Vehiculo vehiculo) {

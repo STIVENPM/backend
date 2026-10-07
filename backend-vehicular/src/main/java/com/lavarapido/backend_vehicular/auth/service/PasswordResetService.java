@@ -2,7 +2,6 @@ package com.lavarapido.backend_vehicular.auth.service;
 
 import com.lavarapido.backend_vehicular.auth.entity.TokenRecuperacion;
 import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
-import com.lavarapido.backend_vehicular.auth.exception.UserNotFoundException;
 import com.lavarapido.backend_vehicular.auth.repository.TokenRecuperacionRepository;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
@@ -37,14 +36,13 @@ public class PasswordResetService {
      * Busca el usuario por email, genera un token seguro,
      * lo guarda hasheado en BD y envía el enlace por correo.
      *
-    * Si el email no existe se informa al controlador mediante una
-    * excepcion de dominio para devolver una respuesta clara.
+     * No diferencia públicamente entre cuentas inexistentes e inactivas.
      */
     @Transactional
     public void solicitarRecuperacion(String email, String ipSolicitante) {
 
-        User usuario = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("No existe un usuario con ese correo"));
+        User usuario = userRepository.findByEmail(email).orElse(null);
+        if (usuario == null || !Boolean.TRUE.equals(usuario.getStatus())) return;
 
         String tokenPlano = generarTokenSeguro();
         String tokenHash = hashearSHA256(tokenPlano);
@@ -74,22 +72,26 @@ public class PasswordResetService {
      */
     @Transactional
     public void resetearContrasena(String tokenPlano, String nuevaContrasena) {
+        PasswordRules.requireValid(nuevaContrasena);
+        if (tokenPlano == null || tokenPlano.isBlank()) {
+            throw new IllegalArgumentException("Token invalido");
+        }
 
         // Hashea el token recibido para buscarlo en BD
         String tokenHash = hashearSHA256(tokenPlano);
 
         // Busca el token en BD
         TokenRecuperacion token = tokenRepository.findByTokenHash(tokenHash)
-            .orElseThrow(() -> new RuntimeException("Token inválido"));
+            .orElseThrow(() -> new IllegalArgumentException("Token invalido"));
 
         // Verifica que no haya sido usado antes
         if (token.getUsado()) {
-            throw new RuntimeException("El token ya fue utilizado");
+            throw new IllegalArgumentException("Token invalido");
         }
 
         // Verifica que no haya expirado
         if (LocalDateTime.now().isAfter(token.getExpiracionAt())) {
-            throw new RuntimeException("El token ha expirado");
+            throw new IllegalArgumentException("Token invalido");
         }
 
         // Actualiza la contraseña del usuario con BCrypt

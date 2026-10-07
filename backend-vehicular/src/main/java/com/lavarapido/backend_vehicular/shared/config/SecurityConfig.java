@@ -69,6 +69,11 @@ public class SecurityConfig {
             // DESHABILITAR HTTP BASIC
             // =========================================================
             .httpBasic(basic -> basic.disable())
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, exception) ->
+                    response.sendError(401, "Sesion invalida"))
+                .accessDeniedHandler((request, response, exception) ->
+                    response.sendError(403, "Acceso denegado")))
 
             // =========================================================
             // AUTORIZACIÓN
@@ -93,6 +98,7 @@ public class SecurityConfig {
 
                     "/error"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 
                 // Wompi does not send JWT; integrity is checked in PagoController.
                 .requestMatchers(HttpMethod.POST, "/api/pagos/webhook").permitAll()
@@ -255,6 +261,7 @@ public class SecurityConfig {
                 // OPERADORES
                 // =====================================================
                 .requestMatchers(
+                    "/api/operadores",
                     "/api/operadores/**"
                 ).hasRole("ADMIN")
 

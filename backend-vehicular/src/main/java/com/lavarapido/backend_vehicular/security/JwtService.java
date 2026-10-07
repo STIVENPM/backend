@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 
 import javax.crypto.SecretKey;
 
@@ -19,16 +20,22 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    @PostConstruct
+    void validateSigningKey() {
+        if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT signing key must be at least 32 bytes");
+        }
+    }
+
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ── MODIFICADO: ahora recibe también el rol y lo mete como claim ──
-    public String generateToken(String email, String role) {
+    // El token solo identifica la cuenta; el rol se lee de la base en cada petición.
+    public String generateToken(String email) {
 
         return Jwts.builder()
                 .subject(email)
-                .claim("role", role) // ← nuevo: el rol viaja dentro del token
                 .issuedAt(new Date())
                 .expiration(
                         new Date(
@@ -42,11 +49,6 @@ public class JwtService {
 
     public String extractEmail(String token) {
         return getClaims(token).getSubject();
-    }
-
-    // ── NUEVO: extrae el rol guardado en el claim ──
-    public String extractRole(String token) {
-        return getClaims(token).get("role", String.class);
     }
 
     public boolean isTokenValid(String token) {

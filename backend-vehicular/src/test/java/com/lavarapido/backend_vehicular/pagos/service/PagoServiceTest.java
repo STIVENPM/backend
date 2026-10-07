@@ -16,13 +16,10 @@ import com.lavarapido.backend_vehicular.pagos.repository.PagoRepository;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
-import com.lavarapido.backend_vehicular.roles.entity.Role;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
-import com.lavarapido.backend_vehicular.users.entity.UserRole;
-import com.lavarapido.backend_vehicular.users.repository.UserRepository;
-import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,8 +53,7 @@ class PagoServiceTest {
     private PagoRepository pagoRepository;
     private PagoIntentoRepository intentoRepository;
     private ReservaRepository reservaRepository;
-    private UserRepository userRepository;
-    private UserRoleRepository userRoleRepository;
+    private AccountAccessService accountAccessService;
     private WompiTransactionClient transactionClient;
     private WompiProperties properties;
     private WompiConfigurationService configurationService;
@@ -72,8 +68,7 @@ class PagoServiceTest {
         pagoRepository = mock(PagoRepository.class);
         intentoRepository = mock(PagoIntentoRepository.class);
         reservaRepository = mock(ReservaRepository.class);
-        userRepository = mock(UserRepository.class);
-        userRoleRepository = mock(UserRoleRepository.class);
+        accountAccessService = mock(AccountAccessService.class);
         transactionClient = mock(WompiTransactionClient.class);
 
         properties = new WompiProperties();
@@ -84,8 +79,8 @@ class PagoServiceTest {
         properties.setEventsSecret("test_events_ficticio");
         configurationService = new WompiConfigurationService(properties);
         WompiSignatureService signatureService = new WompiSignatureService(properties, configurationService);
-        service = new PagoService(pagoRepository, intentoRepository, reservaRepository, userRepository,
-                userRoleRepository, properties, configurationService, signatureService, transactionClient);
+        service = new PagoService(pagoRepository, intentoRepository, reservaRepository,
+                accountAccessService, properties, configurationService, signatureService, transactionClient);
         ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:5173");
 
         owner = new User();
@@ -97,6 +92,8 @@ class PagoServiceTest {
                 .idReserva(RESERVA_ID)
                 .usuario(owner)
                 .servicio(servicio)
+                .precioPactado(new BigDecimal("35000"))
+                .duracionMinutosPactada(60)
                 .estado(EstadoReserva.PENDIENTE)
                 .build();
         pago = Pago.builder()
@@ -116,8 +113,7 @@ class PagoServiceTest {
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(owner.getEmail(), null));
-        when(userRepository.findByEmail(owner.getEmail())).thenReturn(Optional.of(owner));
-        when(userRoleRepository.findActiveRoleByUserId(OWNER_ID)).thenReturn(Optional.empty());
+        when(accountAccessService.activeUser(owner.getEmail())).thenReturn(owner);
         when(intentoRepository.findByReferenciaForUpdate(REFERENCIA)).thenReturn(Optional.of(intento));
         when(intentoRepository.findByWompiEnvironmentAndWompiTransactionId(any(), any())).thenReturn(Optional.empty());
         when(pagoRepository.findByIdForUpdate(PAGO_ID)).thenReturn(Optional.of(pago));
@@ -218,6 +214,20 @@ class PagoServiceTest {
         assertEquals(REFERENCIA, response.referencia());
         verify(reservaRepository).findByIdForUpdate(RESERVA_ID);
         verify(intentoRepository, never()).save(any());
+    }
+
+    @Test
+    void precioNuevoDelCatalogoNoCambiaElMontoPactado() {
+        reserva.getServicio().setPrecio(new BigDecimal("99999"));
+        when(reservaRepository.findByIdForUpdate(RESERVA_ID)).thenReturn(Optional.of(reserva));
+        when(pagoRepository.findByReservaIdForUpdate(RESERVA_ID)).thenReturn(Optional.of(pago));
+        when(intentoRepository.findFirstByPago_IdPagoAndEstadoOrderByCreatedAtDesc(PAGO_ID, EstadoIntentoPago.pendiente))
+                .thenReturn(Optional.of(intento));
+
+        PagoWidgetResponseDTO response = service.iniciar(RESERVA_ID);
+
+        assertEquals(3_500_000L, response.montoEnCentavos());
+        assertEquals(new BigDecimal("35000"), reserva.getPrecioPactado());
     }
 
     @Test
@@ -332,11 +342,7 @@ class PagoServiceTest {
     }
 
     private void autenticarAdmin() {
-        Role role = new Role(UUID.randomUUID(), "ADMIN", "Administrador");
-        UserRole userRole = new UserRole();
-        userRole.setUser(owner);
-        userRole.setRole(role);
-        when(userRoleRepository.findActiveRoleByUserId(OWNER_ID)).thenReturn(Optional.of(userRole));
+        when(accountAccessService.currentRole(owner)).thenReturn("ADMIN");
     }
 
     private ObjectNode evento(String estado, String metodo, long monto, String moneda, String ambiente) {

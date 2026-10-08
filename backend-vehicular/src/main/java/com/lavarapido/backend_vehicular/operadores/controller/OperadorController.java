@@ -27,16 +27,19 @@ public class OperadorController {
 
     private final OperadorService operadorService;
 
+    // Recibe la cuenta que un admin convertirá en operador.
     @PostMapping
     public ResponseEntity<OperadorResponseDTO> crear(@Valid @RequestBody OperadorRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(operadorService.crear(request));
     }
 
+    // Expone operadores al panel administrador.
     @GetMapping
     public ResponseEntity<List<OperadorResponseDTO>> listarTodos() {
         return ResponseEntity.ok(operadorService.listarTodos());
     }
 
+    // Recibe la activación o desactivación.
     @PatchMapping("/{id}/estado")
     public ResponseEntity<OperadorResponseDTO> cambiarEstado(
             @PathVariable UUID id,
@@ -44,6 +47,7 @@ public class OperadorController {
         return ResponseEntity.ok(operadorService.cambiarEstado(id, request));
     }
 
+    // Solicita desactivar todos los operadores.
     @PatchMapping("/desactivar-todos")
     public ResponseEntity<OperadoresDesactivadosResponseDTO> desactivarTodos() {
         return ResponseEntity.ok(operadorService.desactivarTodos());

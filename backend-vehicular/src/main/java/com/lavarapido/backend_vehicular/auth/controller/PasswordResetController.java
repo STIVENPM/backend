@@ -40,6 +40,7 @@ public class PasswordResetController {
         try {
             passwordResetService.solicitarRecuperacion(request.email(), ip);
         } catch (EmailDeliveryException exception) {
+            // Registra el fallo SMTP sin revelar si la cuenta existe.
             logger.warn("No fue posible enviar el correo de recuperacion ({})", exception.getClass().getSimpleName());
         }
 

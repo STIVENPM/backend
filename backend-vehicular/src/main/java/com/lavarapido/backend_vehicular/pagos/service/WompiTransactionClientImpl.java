@@ -16,6 +16,7 @@ public class WompiTransactionClientImpl implements WompiTransactionClient {
     private final WompiProperties properties;
     private final WompiConfigurationService configurationService;
 
+    // Consulta a Wompi con la clave privada y devuelve la transacción.
     @Override
     public JsonNode consultar(String transactionId) {
         configurationService.validarConsulta();

@@ -20,6 +20,7 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    // Impide arrancar con una clave de firma demasiado corta.
     @PostConstruct
     void validateSigningKey() {
         if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
@@ -31,7 +32,7 @@ public class JwtService {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // El token solo identifica la cuenta; el rol se lee de la base en cada petición.
+    // El JWT identifica por email y caduca una hora después; no fija el rol.
     public String generateToken(String email) {
 
         return Jwts.builder()
@@ -47,10 +48,12 @@ public class JwtService {
                 .compact();
     }
 
+    // Recupera el email firmado que identifica la cuenta.
     public String extractEmail(String token) {
         return getClaims(token).getSubject();
     }
 
+    // Verifica firma y caducidad; un JWT inválido no autentica.
     public boolean isTokenValid(String token) {
         try {
             getClaims(token);

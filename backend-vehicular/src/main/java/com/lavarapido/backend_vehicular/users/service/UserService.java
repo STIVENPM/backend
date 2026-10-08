@@ -31,13 +31,11 @@ public class UserService {
     private final AccountAccessService accountAccessService;
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, AccountAccessService accountAccessService) { this.userRepository=userRepository; this.passwordEncoder=passwordEncoder; this.jwtService=jwtService; this.accountAccessService=accountAccessService; }
 
-    // 🔥 REGISTRO DE USUARIO
-    // @Transactional garantiza que si ocurre un error durante el proceso,
-    // toda la operacion se revierte automaticamente (rollback)
-    // evitando registros incompletos o inconsistentes en base de datos
+    // Registra la cuenta en una transacción: un fallo revierte el guardado.
     @Transactional
     public UserRegistrationResponseDTO registerUser(UserRegistrationDTO dto) {
 
+        // Rechaza una contraseña inválida antes de crear la entidad.
         PasswordRules.requireValid(dto.getPassword());
 
         // verifica disponibilidad del correo para evitar duplicados
@@ -59,21 +57,17 @@ public class UserService {
         user.setDocumentType(dto.getDocumentType());
         user.setDocumentNumber(dto.getDocumentNumber());
 
-        // encriptacion de la contrasena usando BCrypt
-        // nunca se debe guardar la contrasena en texto plano
-        // el resultado encaja con CHAR(60) en PostgreSQL
+        // Aquí la contraseña del DTO se convierte en hash BCrypt antes de persistir.
         user.setPassword(
             passwordEncoder.encode(dto.getPassword())
         );
 
-        // guarda el usuario en la base de datos
-        // Hibernate genera el UUID automaticamente y retorna
-        // el objeto persistido con sus datos completos
+        // Persiste la cuenta y devuelve sus datos públicos, sin contraseña.
         User saved = userRepository.save(user);
         return new UserRegistrationResponseDTO(saved.getUserId(), saved.getFirstName(), saved.getEmail());
     }
 
-// 🔐 LOGIN DE USUARIO
+    // Compara la contraseña enviada con el hash guardado y emite el JWT.
 public LoginResponseDTO login(LoginDTO dto) {
 
     User user = userRepository.findByEmail(dto.getEmail())
@@ -82,6 +76,7 @@ public LoginResponseDTO login(LoginDTO dto) {
         throw new BadCredentialsException("Credenciales incorrectas");
     }
 
+    // BCrypt compara el texto recibido con el hash de users.password.
     boolean valid = passwordEncoder.matches(
         dto.getPassword(),
         user.getPassword()
@@ -91,6 +86,7 @@ public LoginResponseDTO login(LoginDTO dto) {
         throw new BadCredentialsException("Credenciales incorrectas");
     }
 
+    // El rol se lee de las asignaciones activas, no de lo enviado por el cliente.
     String roleName = accountAccessService.currentRole(user);
 
     String token = jwtService.generateToken(user.getEmail());
@@ -106,6 +102,7 @@ public LoginResponseDTO login(LoginDTO dto) {
     return new LoginResponseDTO(token, info);
 }
 
+    // Vuelve a consultar el usuario y su rol actual para /users/me.
     public UserSessionDTO getSession() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = accountAccessService.activeUser(email);
@@ -113,12 +110,14 @@ public LoginResponseDTO login(LoginDTO dto) {
                 accountAccessService.currentRole(user));
     }
 
+    // Devuelve el perfil del usuario autenticado.
     public UserProfileResponseDTO getProfile() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = accountAccessService.activeUser(email);
         return UserProfileResponseDTO.from(user);
     }
 
+    // Actualiza solo los datos de perfil permitidos.
     @Transactional
     public UserProfileResponseDTO updateProfile(UserProfileUpdateDTO dto) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();

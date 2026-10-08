@@ -21,11 +21,13 @@ public class WompiSignatureService {
     private final WompiProperties properties;
     private final WompiConfigurationService configurationService;
 
+    // Firma referencia, monto y moneda para abrir el Widget.
     public String crearFirmaIntegridad(String referencia, long montoEnCentavos, String moneda) {
         configurationService.validarWidget();
         return sha256(referencia + montoEnCentavos + moneda + requiredSecret(properties.getIntegritySecret(), "integridad"));
     }
 
+    // Compara el checksum recibido con la firma calculada.
     public boolean firmaWebhookValida(JsonNode evento, String checksumHeader) {
         configurationService.validarEventos();
         JsonNode signature = evento.path("signature");

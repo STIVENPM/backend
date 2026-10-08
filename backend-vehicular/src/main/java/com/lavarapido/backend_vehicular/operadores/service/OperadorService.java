@@ -37,6 +37,7 @@ public class OperadorService {
     private final AccountAccessService accountAccessService;
     private final AdminIdentityPolicy adminIdentityPolicy;
 
+    // Solo un admin puede convertir un usuario existente en operador.
     @Transactional
     public OperadorResponseDTO crear(OperadorRequestDTO request) {
         accountAccessService.requireAdministrator();
@@ -53,6 +54,7 @@ public class OperadorService {
             throw new IllegalStateException("El usuario ya está registrado como operador");
         }
 
+        // Revoca el rol anterior y activa OPERATOR antes de crear la fila de operador.
         setRole(usuario, "OPERATOR");
 
         Operador operador = Operador.builder()
@@ -62,6 +64,7 @@ public class OperadorService {
         return mapearAResponse(operadorRepository.save(operador));
     }
 
+    // Consulta los operadores registrados.
     @Transactional(readOnly = true)
     public List<OperadorResponseDTO> listarTodos() {
         accountAccessService.requireAdministrator();
@@ -70,6 +73,7 @@ public class OperadorService {
                 .toList();
     }
 
+    // Sincroniza estado del operador y rol activo del usuario.
     @Transactional
     public OperadorResponseDTO cambiarEstado(UUID idOperador, OperadorEstadoRequestDTO request) {
         accountAccessService.requireAdministrator();
@@ -91,6 +95,7 @@ public class OperadorService {
         return mapearAResponse(operadorRepository.save(operador));
     }
 
+    // Revoca el rol operador de todas las cuentas activas.
     @Transactional
     public OperadoresDesactivadosResponseDTO desactivarTodos() {
         accountAccessService.requireAdministrator();

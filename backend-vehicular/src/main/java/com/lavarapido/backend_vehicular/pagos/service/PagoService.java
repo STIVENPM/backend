@@ -55,6 +55,7 @@ public class PagoService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    // Bloquea la reserva y crea o reutiliza el intento pendiente de pago.
     @Transactional
     public PagoWidgetResponseDTO iniciar(UUID idReserva) {
         configurationService.validarWidget();
@@ -65,6 +66,7 @@ public class PagoService {
             throw new PagoConflictException("Solo se puede pagar una reserva en estado PENDIENTE");
         }
 
+        // Cobra el precio pactado al reservar, no el precio actual del servicio.
         BigDecimal monto = validarMonto(reserva.getPrecioPactado());
         Pago pago = pagoRepository.findByReservaIdForUpdate(idReserva).orElseGet(() ->
                 pagoRepository.save(Pago.builder()
@@ -81,6 +83,7 @@ public class PagoService {
             throw new PagoConflictException("La reserva ya tiene un pago aprobado");
         }
 
+        // Reutiliza el intento pendiente para evitar abrir otro cobro simultáneo.
         PagoIntento pendiente = intentoRepository
                 .findFirstByPago_IdPagoAndEstadoOrderByCreatedAtDesc(pago.getIdPago(), EstadoIntentoPago.pendiente)
                 .orElse(null);
@@ -99,6 +102,7 @@ public class PagoService {
         return widget(pago, intento, false);
     }
 
+    // Solo el dueño o un admin puede consultar el pago.
     @Transactional(readOnly = true)
     public PagoResponseDTO obtenerPorReserva(UUID idReserva) {
         Pago pago = pagoRepository.findByReserva_IdReserva(idReserva)
@@ -107,6 +111,7 @@ public class PagoService {
         return response(pago);
     }
 
+    // Acepta solo eventos Wompi del tipo y ambiente esperados.
     @Transactional
     public ResultadoEvento procesarEvento(JsonNode evento) {
         String tipo = evento.path("event").asString();
@@ -126,6 +131,7 @@ public class PagoService {
         return procesarTransaccion(transaction, ambiente);
     }
 
+    // Solo un admin consulta en Wompi intentos pendientes conocidos.
     @Transactional
     public PagoResponseDTO reconciliar(UUID idReserva) {
         User usuario = obtenerUsuarioAutenticado();
@@ -157,6 +163,7 @@ public class PagoService {
         return response(pago);
     }
 
+    // Consulta la transacción en Wompi y compara ID y referencia.
     @Transactional
     public PagoResponseDTO verificar(UUID idReserva, String referencia, String transactionId) {
         if (referencia == null || referencia.isBlank() || referencia.length() > 100
@@ -195,6 +202,7 @@ public class PagoService {
     }
 
     private ResultadoEvento aplicarTransaccion(PagoIntento intento, TransaccionWompi datos, String ambiente) {
+        // Estos datos vienen de Wompi; deben coincidir con el intento local antes de aprobar.
         if (!intento.getWompiEnvironment().equals(ambiente)) {
             throw new WompiEventoInvalidoException("El ambiente de la transaccion no coincide con el intento");
         }

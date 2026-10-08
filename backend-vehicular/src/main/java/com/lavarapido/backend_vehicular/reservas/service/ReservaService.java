@@ -43,6 +43,7 @@ public class ReservaService {
     private final AsignacionRepository asignacionRepository;
     public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; }
 
+    // Comprueba dueño, disponibilidad y horario; guarda precio y duración pactados.
     @Transactional
     public ReservaResponseDTO crear(ReservaRequestDTO request) {
         User usuario = obtenerUsuarioAutenticado();
@@ -70,6 +71,7 @@ public class ReservaService {
         LocalTime horaFin = request.getHoraReserva().plusMinutes(servicio.getDuracionMinutos());
         validarHoraFinReserva(horaFin);
 
+        // Busca otra reserva del mismo vehículo que ocupe este intervalo.
         List<Reserva> solapamientos = reservaRepository.findSolapamientosPorVehiculo(
                 vehiculo.getIdVehiculo(),
                 request.getFechaReserva(),
@@ -82,6 +84,7 @@ public class ReservaService {
             throw new HorarioReservaInvalidoException("Ya existe una reserva solapada para ese vehículo en ese horario");
         }
 
+        // Copia precio y duración actuales para que cambios del catálogo no alteren esta reserva.
         Reserva reserva = Reserva.builder()
                 .usuario(vehiculo.getUsuario())
                 .vehiculo(vehiculo)
@@ -96,6 +99,7 @@ public class ReservaService {
         return mapearAResponse(reservaRepository.save(reserva));
     }
 
+    // Solo el dueño o un admin puede ver esta reserva.
     public ReservaResponseDTO obtenerPorId(UUID idReserva) {
         Reserva reserva = reservaRepository.findById(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
@@ -108,6 +112,7 @@ public class ReservaService {
         return mapearAResponse(reserva, operadorNombre);
     }
 
+    // Protege la lista de reservas de otro usuario.
     public List<ReservaResponseDTO> obtenerPorUsuario(UUID idUsuario) {
         User usuarioSolicitado = userRepository.findById(idUsuario)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
@@ -121,11 +126,13 @@ public class ReservaService {
         return mapearReservas(reservas);
     }
 
+    // Lista reservas para el panel administrador.
     public List<ReservaResponseDTO> obtenerTodas() {
         List<Reserva> reservas = reservaRepository.findAll();
         return mapearReservas(reservas);
     }
 
+    // Aplica la máquina de estados y guarda marcas de tiempo.
     @Transactional
     public ReservaResponseDTO cambiarEstado(UUID idReserva, EstadoReserva nuevoEstado) {
         Reserva reserva = reservaRepository.findById(idReserva)
@@ -145,6 +152,7 @@ public class ReservaService {
         return mapearAResponse(reservaRepository.save(reserva));
     }
 
+    // Reutiliza la transición de estado hacia CANCELADA.
     @Transactional
     public ReservaResponseDTO cancelar(UUID idReserva) {
         Reserva reserva = reservaRepository.findById(idReserva)

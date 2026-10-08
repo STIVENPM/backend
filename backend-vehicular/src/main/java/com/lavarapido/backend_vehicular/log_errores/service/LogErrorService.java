@@ -15,16 +15,19 @@ import java.util.UUID;
 @Service @RequiredArgsConstructor
 public class LogErrorService {
     private final LogErrorRepository repository; private final UserRepository userRepository;
+    // Persiste un error con usuario opcional e IP.
     @Transactional public void registrar(UUID usuarioId, TipoError tipo, String descripcion, String ipOrigen) {
         User usuario = usuarioId == null ? null : userRepository.findById(usuarioId).orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
         repository.save(LogError.builder().usuario(usuario).tipoError(tipo).descripcion(descripcion).ipOrigen(ipOrigen).build());
     }
+    // Filtra y pagina los errores registrados.
     @Transactional(readOnly = true) public Page<LogErrorResponseDTO> listar(Boolean resuelto, Pageable pageable) {
         Specification<LogError> spec = resuelto == null
                 ? (root, query, criteriaBuilder) -> criteriaBuilder.conjunction()
                 : (root, q, cb) -> cb.equal(root.get("resuelto"), resuelto);
         return repository.findAll(spec, pageable).map(this::map);
     }
+    // Marca el error como resuelto sin eliminar el registro.
     @Transactional public LogErrorResponseDTO resolver(UUID id) { LogError error = repository.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Error no encontrado")); error.setResuelto(true); return map(repository.save(error)); }
     private LogErrorResponseDTO map(LogError e) { return new LogErrorResponseDTO(e.getIdError(), e.getUsuario() == null ? null : e.getUsuario().getUserId(), e.getTipoError(), e.getDescripcion(), e.getIpOrigen(), e.getResuelto(), e.getCreatedAt(), e.getUpdatedAt()); }
 }

@@ -18,6 +18,7 @@ public class VehiculoController {
     public VehiculoController(VehiculoService vehiculoService) { this.vehiculoService = vehiculoService; }
 
     // ── Crear vehículo (app móvil — cliente autenticado) ────────────
+    // Valida el JSON y delega el alta del vehículo.
     @PostMapping
     public ResponseEntity<?> crear(@Valid @RequestBody VehiculoRequestDTO dto) {
         try {
@@ -29,18 +30,21 @@ public class VehiculoController {
     }
 
     // ── Mis vehículos (app móvil — cliente autenticado) ─────────────
+    // Consulta solo los vehículos del usuario actual.
     @GetMapping("/mis-vehiculos")
     public ResponseEntity<List<VehiculoResponseDTO>> listarMisVehiculos() {
         return ResponseEntity.ok(vehiculoService.listarMisVehiculos());
     }
 
     // ── Listar todos (web admin) ─────────────────────────────────────
+    // Entrega todos los vehículos al panel.
     @GetMapping
     public ResponseEntity<List<VehiculoResponseDTO>> listarTodos() {
         return ResponseEntity.ok(vehiculoService.listarTodos());
     }
 
     // ── Obtener por id ───────────────────────────────────────────────
+    // Busca un vehículo por UUID.
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerPorId(@PathVariable UUID id) {
         try {
@@ -51,6 +55,7 @@ public class VehiculoController {
     }
 
     // ── Actualizar ─────────────────────────────────────────────────
+    // Recibe y valida los nuevos datos del vehículo.
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizar(
             @PathVariable UUID id,
@@ -64,6 +69,7 @@ public class VehiculoController {
     }
 
     // ── Cambiar estado (activar / desactivar — borrado lógico) ──────
+    // Recibe el cambio de estado sin borrar la fila.
     @PatchMapping("/{id}/estado")
     public ResponseEntity<?> cambiarEstado(
             @PathVariable UUID id,

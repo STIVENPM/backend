@@ -20,6 +20,7 @@ public class MarcaService {
     public MarcaService(MarcaRepository marcaRepository) { this.marcaRepository = marcaRepository; }
 
     // ── CREAR (admin — marca nace ya aprobada) ────────────────────
+    // Normaliza el nombre y crea una marca activa.
     @Transactional
     public MarcaResponseDTO crear(MarcaRequestDTO dto) {
 
@@ -39,6 +40,7 @@ public class MarcaService {
     }
 
     // ── LISTAR ACTIVAS (catálogo — cliente + admin) ────────────────
+    // Entrega solo marcas disponibles en el catálogo.
     public List<MarcaResponseDTO> listarActivas() {
         return marcaRepository.findByEstadoTrue()
             .stream()
@@ -47,6 +49,7 @@ public class MarcaService {
     }
 
     // ── LISTAR PENDIENTES (panel admin — solicitudes por revisar) ──
+    // Entrega el catálogo completo para administración.
     public List<MarcaResponseDTO> listarTodas() {
         return marcaRepository.findAll()
             .stream()
@@ -54,6 +57,7 @@ public class MarcaService {
             .toList();
     }
 
+    // Consulta marcas pendientes de aprobación.
     public List<MarcaResponseDTO> listarPendientes() {
         return marcaRepository.findByEstadoFalse()
             .stream()
@@ -62,6 +66,7 @@ public class MarcaService {
     }
 
     // ── BUSCAR (admin — barra de búsqueda del catálogo completo) ───
+    // Busca marcas por nombre.
     public List<MarcaResponseDTO> buscar(String nombre) {
         return marcaRepository.findByNombreContainingIgnoreCase(nombre)
             .stream()
@@ -70,12 +75,14 @@ public class MarcaService {
     }
 
     // ── OBTENER POR ID ───────────────────────────────────────────────
+    // Recupera una marca por su identificador.
     public MarcaResponseDTO obtenerPorId(UUID idMarca) {
         Marca marca = buscarMarcaOrThrow(idMarca);
         return mapearAResponse(marca);
     }
 
     // ── ACTUALIZAR (admin — ej. corregir nombre mal escrito antes de aprobar) ──
+    // Evita nombres duplicados y guarda el cambio.
     @Transactional
     public MarcaResponseDTO actualizar(UUID idMarca, MarcaRequestDTO dto) {
 
@@ -95,6 +102,7 @@ public class MarcaService {
     }
 
     // ── CAMBIAR ESTADO (aprobar una pendiente / activar-desactivar) ──
+    // Aprueba o desactiva la marca sin eliminarla.
     @Transactional
     public MarcaResponseDTO cambiarEstado(UUID idMarca, boolean activo) {
         Marca marca = buscarMarcaOrThrow(idMarca);

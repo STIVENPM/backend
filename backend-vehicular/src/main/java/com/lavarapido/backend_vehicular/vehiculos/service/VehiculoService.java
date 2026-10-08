@@ -27,6 +27,7 @@ public class VehiculoService {
     public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository, AccountAccessService accountAccessService) { this.vehiculoRepository=vehiculoRepository; this.marcaRepository=marcaRepository; this.accountAccessService=accountAccessService; }
 
     // ── CREAR ──────────────────────────────────────────────────────
+    // Asocia el vehículo a la cuenta autenticada y valida la marca.
     @Transactional
     public VehiculoResponseDTO crear(VehiculoRequestDTO dto) {
 
@@ -54,6 +55,7 @@ public class VehiculoService {
     }
 
     // ── LISTAR "MIS VEHÍCULOS" (app móvil) ────────────────────────
+    // Filtra los vehículos del usuario autenticado.
     public List<VehiculoResponseDTO> listarMisVehiculos() {
         User usuarioAutenticado = obtenerUsuarioAutenticado();
         return vehiculoRepository.findByUsuario_UserIdAndEstadoTrue(usuarioAutenticado.getUserId())
@@ -63,6 +65,7 @@ public class VehiculoService {
     }
 
     // ── LISTAR TODOS (panel admin) ────────────────────────────────
+    // Consulta el inventario de vehículos para administración.
     public List<VehiculoResponseDTO> listarTodos() {
         return vehiculoRepository.findAll()
             .stream()
@@ -71,6 +74,7 @@ public class VehiculoService {
     }
 
     // ── OBTENER POR ID ─────────────────────────────────────────────
+    // Comprueba acceso antes de entregar un vehículo.
     public VehiculoResponseDTO obtenerPorId(UUID idVehiculo) {
         Vehiculo vehiculo = buscarVehiculoOrThrow(idVehiculo);
         User usuarioAutenticado = obtenerUsuarioAutenticado();
@@ -80,6 +84,7 @@ public class VehiculoService {
     }
 
     // ── ACTUALIZAR ─────────────────────────────────────────────────
+    // Comprueba propiedad o rol admin antes de editar.
     @Transactional
     public VehiculoResponseDTO actualizar(UUID idVehiculo, VehiculoRequestDTO dto) {
 
@@ -108,6 +113,7 @@ public class VehiculoService {
     }
 
     // ── CAMBIAR ESTADO (borrado lógico) ────────────────────────────
+    // Activa o desactiva sin borrar el vehículo.
     @Transactional
     public VehiculoResponseDTO cambiarEstado(UUID idVehiculo, boolean activo) {
         Vehiculo vehiculo = buscarVehiculoOrThrow(idVehiculo);

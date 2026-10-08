@@ -43,6 +43,7 @@ public class AsignacionService {
     // CREAR ASIGNACIÓN
     // =========================================================
 
+    // Comprueba reserva y operador antes de vincularlos.
     @Transactional
     public AsignacionResponseDTO crear(AsignacionRequestDTO request) {
 
@@ -106,6 +107,7 @@ public class AsignacionService {
     // OBTENER MIS ASIGNACIONES
     // =========================================================
 
+    // Devuelve tareas del operador autenticado.
     @Transactional(readOnly = true)
     public List<AsignacionResponseDTO> obtenerMisAsignaciones() {
 
@@ -125,6 +127,7 @@ public class AsignacionService {
     // CAMBIAR ESTADO DE ASIGNACIÓN
     // =========================================================
 
+    // El operador asignado cambia estado y se valida la transición.
     @Transactional
     public AsignacionResponseDTO cambiarEstado(
             UUID idAsignacion,

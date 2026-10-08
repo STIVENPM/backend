@@ -43,6 +43,7 @@ public class EmailService {
             "– Equipo Lava Rápido Vehicular"
         );
 
+        // Aquí se entrega el mensaje al servidor SMTP configurado.
         mailSender.send(mensaje);
     }
 }

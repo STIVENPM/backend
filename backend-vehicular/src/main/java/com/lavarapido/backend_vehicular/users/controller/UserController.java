@@ -22,28 +22,33 @@ public class UserController {
     private final UserService userService;
     public UserController(UserService userService) { this.userService = userService; }
 
-    // 🔥 REGISTRO
+    //  REGISTRO
+    // Recibe el registro validado y devuelve 201.
     @PostMapping("/register")
     public ResponseEntity<UserRegistrationResponseDTO> register(@Valid @RequestBody UserRegistrationDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.registerUser(dto));
     }
 
-    // 🔐 LOGIN
+    //  LOGIN
+    // Envía las credenciales al servicio y devuelve token y usuario.
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginDTO dto) {
         return ResponseEntity.ok(userService.login(dto));
     }
 
+    // Expone la identidad y el rol vigentes para el cliente.
     @GetMapping("/me")
     public ResponseEntity<UserSessionDTO> session() {
         return ResponseEntity.ok(userService.getSession());
     }
 
+    // Devuelve el perfil del usuario autenticado.
     @GetMapping("/profile")
     public ResponseEntity<UserProfileResponseDTO> profile() {
         return ResponseEntity.ok(userService.getProfile());
     }
 
+    // Valida el JSON y delega la actualización del perfil.
     @PutMapping("/profile")
     public ResponseEntity<UserProfileResponseDTO> updateProfile(@Valid @RequestBody UserProfileUpdateDTO dto) {
         return ResponseEntity.ok(userService.updateProfile(dto));

@@ -20,28 +20,33 @@ public class PagoController {
     private final PagoService pagoService;
     private final WompiSignatureService signatureService;
 
+    // Prepara el Widget y distingue intento nuevo del reutilizado.
     @PostMapping("/reserva/{idReserva}")
     public ResponseEntity<PagoWidgetResponseDTO> iniciar(@PathVariable UUID idReserva) {
         PagoWidgetResponseDTO response = pagoService.iniciar(idReserva);
         return ResponseEntity.status(response.reutilizado() ? HttpStatus.OK : HttpStatus.CREATED).body(response);
     }
 
+    // Consulta el pago y sus intentos.
     @GetMapping("/reserva/{idReserva}")
     public ResponseEntity<PagoResponseDTO> obtenerPorReserva(@PathVariable UUID idReserva) {
         return ResponseEntity.ok(pagoService.obtenerPorReserva(idReserva));
     }
 
+    // Permite al admin consultar un intento pendiente en Wompi.
     @PostMapping("/reserva/{idReserva}/reconciliar")
     public ResponseEntity<PagoResponseDTO> reconciliar(@PathVariable UUID idReserva) {
         return ResponseEntity.ok(pagoService.reconciliar(idReserva));
     }
 
+    // Envía referencia e ID de Wompi para verificación servidor.
     @PostMapping("/reserva/{idReserva}/verificar")
     public ResponseEntity<PagoResponseDTO> verificar(@PathVariable UUID idReserva,
                                                       @RequestBody VerificarTransaccionRequest request) {
         return ResponseEntity.ok(pagoService.verificar(idReserva, request.referencia(), request.transactionId()));
     }
 
+    // Verifica la firma antes de procesar el aviso de Wompi.
     @PostMapping("/webhook")
     public ResponseEntity<Void> webhook(@RequestBody JsonNode evento,
                                         @RequestHeader(value = "X-Event-Checksum", required = false) String checksum) {

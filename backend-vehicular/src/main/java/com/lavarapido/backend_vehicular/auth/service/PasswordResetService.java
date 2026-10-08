@@ -53,6 +53,7 @@ public class PasswordResetService {
         token.setExpiracionAt(LocalDateTime.now().plusMinutes(TTL_MINUTOS));
         token.setUsado(false);
         token.setIpSolicitante(ipSolicitante);
+        // Persiste el hash; el token plano solo se envía en el enlace.
         tokenRepository.save(token);
 
         try {
@@ -118,7 +119,7 @@ public class PasswordResetService {
 
     /**
      * Hashea un String con SHA-256 y retorna el resultado en hexadecimal.
-     * El hash tiene exactamente 64 caracteres, coincide con CHAR(64) en BD.
+     * El hash tiene exactamente 64 caracteres y cabe en VARCHAR(64) de la BD.
      */
     private String hashearSHA256(String input) {
         try {

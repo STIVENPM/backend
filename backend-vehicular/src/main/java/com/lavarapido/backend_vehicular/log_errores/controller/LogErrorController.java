@@ -10,6 +10,8 @@ import java.util.UUID;
 @RestController @RequestMapping("/api/log-errores") @RequiredArgsConstructor
 public class LogErrorController {
     private final LogErrorService service;
+    // Filtra errores por resolución y devuelve una página.
     @GetMapping public ResponseEntity<Page<LogErrorResponseDTO>> listar(@RequestParam(required = false) Boolean resuelto, @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) { return ResponseEntity.ok(service.listar(resuelto, pageable)); }
+    // Marca un error como atendido.
     @PatchMapping("/{id}/resolver") public ResponseEntity<LogErrorResponseDTO> resolver(@PathVariable UUID id) { return ResponseEntity.ok(service.resolver(id)); }
 }

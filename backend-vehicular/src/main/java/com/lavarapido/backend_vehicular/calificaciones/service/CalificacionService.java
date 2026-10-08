@@ -19,6 +19,7 @@ import java.util.UUID;
 @Service @RequiredArgsConstructor
 public class CalificacionService {
     private final CalificacionRepository calificacionRepository; private final ReservaRepository reservaRepository; private final AccountAccessService accountAccessService;
+    // Solo el dueño califica una reserva finalizada una vez.
     @Transactional public CalificacionResponseDTO crear(CalificacionRequestDTO request) {
         User usuario = usuarioActual();
         Reserva reserva = reservaRepository.findById(request.reservaId()).orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
@@ -27,6 +28,7 @@ public class CalificacionService {
         if (calificacionRepository.existsByReserva_IdReserva(reserva.getIdReserva())) throw new IllegalStateException("La reserva ya tiene una calificacion");
         return map(calificacionRepository.save(Calificacion.builder().reserva(reserva).usuario(usuario).puntuacion(request.puntuacion()).comentario(request.comentario()).build()));
     }
+    // Restringe la consulta al dueño o a un admin.
     @Transactional(readOnly = true) public CalificacionResponseDTO obtenerPorReserva(UUID idReserva) {
         Reserva reserva = reservaRepository.findById(idReserva).orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         User usuario = usuarioActual();

@@ -19,6 +19,7 @@ public class ServicioService {
 
     public ServicioService(ServicioRepository servicioRepository) { this.servicioRepository = servicioRepository; }
 
+    // Evita nombres repetidos y guarda el servicio activo.
     public ServicioResponseDTO crear(ServicioRequestDTO request) {
         if (servicioRepository.existsByNombre(request.getNombre())) {
             throw new IllegalArgumentException("Ya existe un servicio con ese nombre");
@@ -35,6 +36,7 @@ public class ServicioService {
         return mapearAResponse(guardado);
     }
 
+    // Consulta todos los servicios.
     public List<ServicioResponseDTO> listarTodos() {
         return servicioRepository.findByEstadoTrue()
                 .stream()
@@ -42,6 +44,7 @@ public class ServicioService {
                 .collect(Collectors.toList());
     }
 
+    // Filtra los servicios activos.
     public List<ServicioResponseDTO> listarDisponibles() {
         return servicioRepository.findByEstadoTrue()
                 .stream()
@@ -49,6 +52,7 @@ public class ServicioService {
                 .collect(Collectors.toList());
     }
 
+    // Busca servicios por nombre.
     public List<ServicioResponseDTO> buscarPorNombre(String nombre) {
         return servicioRepository.findByNombreContainingIgnoreCase(nombre)
                 .stream()
@@ -56,12 +60,14 @@ public class ServicioService {
                 .collect(Collectors.toList());
     }
 
+    // Busca el servicio o informa que no existe.
     public ServicioResponseDTO obtenerPorId(UUID id) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));
         return mapearAResponse(servicio);
     }
 
+    // Edita catálogo y vuelve a comprobar el nombre.
     public ServicioResponseDTO actualizar(UUID id, ServicioRequestDTO request) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));
@@ -80,6 +86,7 @@ public class ServicioService {
         return mapearAResponse(actualizado);
     }
 
+    // Cambia disponibilidad sin borrar el servicio.
     public ServicioResponseDTO cambiarEstado(UUID id, boolean activo) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));

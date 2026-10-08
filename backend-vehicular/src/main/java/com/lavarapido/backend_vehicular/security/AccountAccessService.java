@@ -27,6 +27,7 @@ public class AccountAccessService {
         this.administratorIds = administratorIds;
     }
 
+    // Relee la cuenta para invalidar sesiones de usuarios desactivados.
     public User activeUser(String email) {
         User user = users.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid session"));
@@ -36,6 +37,7 @@ public class AccountAccessService {
         return user;
     }
 
+    // Consulta roles activos; rechaza múltiples roles o un ADMIN no autorizado.
     public String currentRole(User user) {
         if (!Boolean.TRUE.equals(user.getStatus())) {
             throw new BadCredentialsException("Invalid session");
@@ -54,6 +56,7 @@ public class AccountAccessService {
                 }
                 yield "ADMIN";
             }
+            // Sin una fila de operador activa, la cuenta conserva permisos USER.
             case "OPERATOR" -> operadores.findByUsuario_UserId(user.getUserId())
                     .filter(operador -> Boolean.TRUE.equals(operador.getEstado()))
                     .map(operador -> "OPERATOR")
@@ -63,6 +66,7 @@ public class AccountAccessService {
         };
     }
 
+    // Exige el rol ADMIN vigente para operaciones sensibles del servicio.
     public User requireAdministrator() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null) {

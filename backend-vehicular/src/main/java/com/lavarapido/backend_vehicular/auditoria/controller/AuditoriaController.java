@@ -13,5 +13,6 @@ import java.util.UUID;
 @RestController @RequestMapping("/api/auditoria") @RequiredArgsConstructor
 public class AuditoriaController {
     private final AuditoriaService service;
+    // Recibe filtros y paginación para consultar auditoría.
     @GetMapping public ResponseEntity<Page<AuditoriaResponseDTO>> listar(@RequestParam(required = false) UUID usuarioId, @RequestParam(required = false) AccionAuditoria accion, @RequestParam(required = false) ModuloAuditoria modulo, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaDesde, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaHasta, @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) { return ResponseEntity.ok(service.listar(usuarioId, accion, modulo, fechaDesde, fechaHasta, pageable)); }
 }

@@ -11,26 +11,31 @@ import java.util.Locale;
 public class WompiConfigurationService {
     private final WompiProperties properties;
 
+    // Comprueba llave pública y secreto de integridad del ambiente elegido.
     public void validarWidget() {
         Ambiente ambiente = ambiente();
         validarPrefijo(properties.getPublicKey(), ambiente.publicKeyPrefix, "llave publica");
         validarPrefijo(properties.getIntegritySecret(), ambiente.integrityPrefix, "secreto de integridad");
     }
 
+    // Comprueba el secreto usado para verificar webhooks.
     public void validarEventos() {
         Ambiente ambiente = ambiente();
         validarPrefijo(properties.getEventsSecret(), ambiente.eventsPrefix, "secreto de eventos");
     }
 
+    // Comprueba la llave privada usada para consultar transacciones.
     public void validarConsulta() {
         Ambiente ambiente = ambiente();
         validarPrefijo(properties.getPrivateKey(), ambiente.privateKeyPrefix, "llave privada");
     }
 
+    // Traduce sandbox/production al valor test/prod de los eventos.
     public String ambienteEventoEsperado() {
         return ambiente().eventValue;
     }
 
+    // Devuelve la API Wompi del ambiente configurado.
     public String apiBaseUrl() {
         return ambiente().apiBaseUrl;
     }

@@ -20,6 +20,7 @@ public class MarcaController {
     public MarcaController(MarcaService marcaService) { this.marcaService = marcaService; }
 
     // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Valida y crea una marca desde la API.
     @PostMapping
     public ResponseEntity<?> crear(@Valid @RequestBody MarcaRequestDTO dto) {
         try {
@@ -31,29 +32,34 @@ public class MarcaController {
     }
 
     // ── Catálogo aprobado (cliente + admin) ───────────────────────────
+    // Expone el catálogo activo.
     @GetMapping("/activas")
     public ResponseEntity<List<MarcaResponseDTO>> listarActivas() {
         return ResponseEntity.ok(marcaService.listarActivas());
     }
 
     // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Expone todas las marcas para administración.
     @GetMapping
     public ResponseEntity<List<MarcaResponseDTO>> listarTodas() {
         return ResponseEntity.ok(marcaService.listarTodas());
     }
 
+    // Expone marcas por revisar.
     @GetMapping("/pendientes")
     public ResponseEntity<List<MarcaResponseDTO>> listarPendientes() {
         return ResponseEntity.ok(marcaService.listarPendientes());
     }
 
     // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Recibe el texto de búsqueda.
     @GetMapping("/buscar")
     public ResponseEntity<List<MarcaResponseDTO>> buscar(@RequestParam String nombre) {
         return ResponseEntity.ok(marcaService.buscar(nombre));
     }
 
     // ── Obtener por id ───────────────────────────────────────────────
+    // Busca la marca indicada por UUID.
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerPorId(@PathVariable UUID id) {
         try {
@@ -64,6 +70,7 @@ public class MarcaController {
     }
 
     // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Valida los cambios de la marca.
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizar(
             @PathVariable UUID id,
@@ -77,6 +84,7 @@ public class MarcaController {
     }
 
     // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Delega la aprobación o desactivación.
     @PatchMapping("/{id}/estado")
     public ResponseEntity<?> cambiarEstado(
             @PathVariable UUID id,

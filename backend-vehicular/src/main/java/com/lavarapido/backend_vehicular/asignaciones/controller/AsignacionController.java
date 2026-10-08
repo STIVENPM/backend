@@ -26,16 +26,19 @@ public class AsignacionController {
 
     private final AsignacionService asignacionService;
 
+    // Recibe reserva y operador para crear la asignación.
     @PostMapping
     public ResponseEntity<AsignacionResponseDTO> crear(@Valid @RequestBody AsignacionRequestDTO request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(asignacionService.crear(request));
     }
 
+    // Entrega las tareas del operador autenticado.
     @GetMapping("/mis-asignaciones")
     public ResponseEntity<List<AsignacionResponseDTO>> obtenerMisAsignaciones() {
         return ResponseEntity.ok(asignacionService.obtenerMisAsignaciones());
     }
 
+    // Recibe el nuevo estado de una tarea.
     @PatchMapping("/{id}/estado")
     public ResponseEntity<AsignacionResponseDTO> cambiarEstado(
             @PathVariable UUID id,

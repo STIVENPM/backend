@@ -16,10 +16,12 @@ import java.util.UUID;
 @Service @RequiredArgsConstructor
 public class AuditoriaService {
     private final AuditoriaRepository repository; private final UserRepository userRepository;
+    // Guarda un evento de auditoría con usuario opcional.
     @Transactional public void registrar(UUID usuarioId, AccionAuditoria accion, String descripcion, String ipOrigen, ModuloAuditoria modulo) {
         User usuario = usuarioId == null ? null : userRepository.findById(usuarioId).orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado"));
         repository.save(Auditoria.builder().usuario(usuario).accion(accion).descripcion(descripcion).ipOrigen(ipOrigen).modulo(modulo).build());
     }
+    // Combina filtros y pagina las entradas de auditoría.
     @Transactional(readOnly = true) public Page<AuditoriaResponseDTO> listar(UUID usuarioId, AccionAuditoria accion, ModuloAuditoria modulo, LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable) {
         Specification<Auditoria> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
         if (usuarioId != null) spec = spec.and((root, q, cb) -> cb.equal(root.get("usuario").get("userId"), usuarioId));

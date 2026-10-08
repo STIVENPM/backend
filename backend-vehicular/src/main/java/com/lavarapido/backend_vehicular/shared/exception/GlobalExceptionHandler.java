@@ -9,6 +9,7 @@ import com.lavarapido.backend_vehicular.pagos.exception.WompiProveedorException;
 import com.lavarapido.backend_vehicular.reservas.exception.HorarioReservaInvalidoException;
 import com.lavarapido.backend_vehicular.reservas.exception.EstadoReservaInvalidoException;
 import com.lavarapido.backend_vehicular.reservas.exception.VehiculoNoPerteneceUsuarioException;
+import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -62,6 +63,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, String>> handleAuthentication(AuthenticationException exception) {
         return response(HttpStatus.UNAUTHORIZED, "Credenciales o sesion invalidas");
+    }
+
+    @ExceptionHandler(CurrentPasswordInvalidException.class)
+    public ResponseEntity<Map<String, String>> handleCurrentPasswordInvalid(CurrentPasswordInvalidException exception) {
+        return response(HttpStatus.BAD_REQUEST, "CURRENT_PASSWORD_INVALID");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

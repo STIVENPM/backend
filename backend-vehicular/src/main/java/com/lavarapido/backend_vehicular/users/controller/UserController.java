@@ -4,6 +4,7 @@ import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
 import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserSessionDTO;
@@ -52,5 +53,12 @@ public class UserController {
     @PutMapping("/profile")
     public ResponseEntity<UserProfileResponseDTO> updateProfile(@Valid @RequestBody UserProfileUpdateDTO dto) {
         return ResponseEntity.ok(userService.updateProfile(dto));
+    }
+
+    // Cambia la contraseña de la cuenta identificada por el JWT.
+    @PutMapping("/password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequestDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.noContent().build();
     }
 }

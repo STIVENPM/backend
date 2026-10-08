@@ -6,16 +6,19 @@ import com.lavarapido.backend_vehicular.auth.service.PasswordRules;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.security.JwtService;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserSessionDTO;
 import com.lavarapido.backend_vehicular.users.entity.User;
+import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -131,5 +134,25 @@ public LoginResponseDTO login(LoginDTO dto) {
         }
 
         return UserProfileResponseDTO.from(userRepository.save(user));
+    }
+
+    // Actualiza la contraseña de la cuenta autenticada, sin aceptar un ID del cliente.
+    @Transactional
+    public void changePassword(ChangePasswordRequestDTO dto) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getName() == null || authentication.getName().isBlank()
+                || "anonymousUser".equals(authentication.getName())) {
+            throw new BadCredentialsException("Invalid session");
+        }
+
+        User user = accountAccessService.activeUser(authentication.getName());
+        if (!passwordEncoder.matches(dto.currentPassword(), user.getPassword())) {
+            throw new CurrentPasswordInvalidException();
+        }
+
+        PasswordRules.requireValid(dto.newPassword());
+        user.setPassword(passwordEncoder.encode(dto.newPassword()));
+        userRepository.save(user);
     }
 }

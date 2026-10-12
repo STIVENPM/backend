@@ -36,7 +36,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EmailDeliveryException.class)
     public ResponseEntity<Map<String, String>> handleEmailDelivery(EmailDeliveryException exception) {
-        logger.warn("Error enviando correo de recuperacion ({})", exception.getClass().getSimpleName());
+        logger.warn("Password reset email delivery failed: category={}, causeType={}",
+                exception.failureCategory(), exception.rootCauseType());
         return response(HttpStatus.SERVICE_UNAVAILABLE, "No fue posible procesar la solicitud");
     }
 

@@ -54,10 +54,11 @@ public class PasswordResetService {
         token.setUsado(false);
         token.setIpSolicitante(ipSolicitante);
         // Persiste el hash; el token plano solo se envía en el enlace.
-        tokenRepository.save(token);
+        tokenRepository.invalidarTokensActivosPorUsuario(usuario.getUserId());
+        tokenRepository.saveAndFlush(token);
 
         try {
-            emailService.enviarCorreoRecuperacion(email, tokenPlano);
+            emailService.enviarCorreoRecuperacion(usuario.getEmail(), tokenPlano);
         } catch (MailException | IllegalStateException exception) {
             throw new EmailDeliveryException("No fue posible enviar el correo de recuperacion", exception);
         }

@@ -1,19 +1,24 @@
 package com.lavarapido.backend_vehicular.auth.service;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final String appFrontendUrl;
+    private final String mailFrom;
 
-    @Value("${app.frontend.url}")
-    private String appFrontendUrl;
+    public EmailService(JavaMailSender mailSender,
+                        @Value("${app.frontend.url}") String appFrontendUrl,
+                        @Value("${app.mail.from:${spring.mail.username:}}") String mailFrom) {
+        this.mailSender = mailSender;
+        this.appFrontendUrl = appFrontendUrl;
+        this.mailFrom = mailFrom;
+    }
 
     /**
      * Envía el correo de recuperación de contraseña.
@@ -27,9 +32,13 @@ public class EmailService {
 
         // Arma el enlace que irá en el correo
         // ejemplo: http://localhost:5173/reset-password?token=abc123
-        String enlace = appFrontendUrl + "/reset-password?token=" + tokenPlano;
+        String frontendBase = appFrontendUrl.endsWith("/")
+                ? appFrontendUrl.substring(0, appFrontendUrl.length() - 1)
+                : appFrontendUrl;
+        String enlace = frontendBase + "/reset-password?token=" + tokenPlano;
 
         SimpleMailMessage mensaje = new SimpleMailMessage();
+        mensaje.setFrom(mailFrom);
         mensaje.setTo(destinatario);
         mensaje.setSubject("Recuperación de contraseña – Lava Rápido Vehicular");
         mensaje.setText(

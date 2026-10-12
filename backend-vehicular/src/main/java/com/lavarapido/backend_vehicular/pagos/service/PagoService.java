@@ -19,6 +19,7 @@ import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +52,7 @@ public class PagoService {
     private final WompiConfigurationService configurationService;
     private final WompiSignatureService signatureService;
     private final WompiTransactionClient transactionClient;
+    private final NotificacionService notificacionService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -241,6 +243,7 @@ public class PagoService {
         Pago pago = pagoRepository.findByIdForUpdate(intento.getPago().getIdPago())
                 .orElseThrow(() -> new PagoConflictException("El pago asociado al intento no existe"));
 
+        EstadoIntentoPago estadoAnterior = intento.getEstado();
         switch (datos.estado()) {
             case "APPROVED" -> aprobar(intento, pago);
             case "DECLINED", "VOIDED", "ERROR" -> rechazar(intento, pago, datos.estado());
@@ -255,6 +258,19 @@ public class PagoService {
         }
         intentoRepository.save(intento);
         pagoRepository.save(pago);
+        if (intento.getEstado() != estadoAnterior) {
+            if (intento.getEstado() == EstadoIntentoPago.aprobado_duplicado) {
+                notificacionService.alertarAdministradores("pago-duplicado:" + intento.getIdIntento(),
+                        "Posible cobro duplicado", "Revisar el pago de la reserva.",
+                        pago.getReserva().getIdReserva(), pago.getIdPago());
+            } else if (intento.getEstado() == EstadoIntentoPago.aprobado
+                    || intento.getEstado() == EstadoIntentoPago.rechazado) {
+                String titulo = intento.getEstado() == EstadoIntentoPago.aprobado ? "Pago aprobado" : "Pago rechazado";
+                notificacionService.crear(pago.getReserva().getUsuario(),
+                        "pago:" + intento.getIdIntento() + ":" + intento.getEstado(),
+                        "payment", titulo, titulo + ".", pago.getReserva().getIdReserva(), pago.getIdPago());
+            }
+        }
         log.info("Intento Wompi actualizado: referencia={}, estadoWompi={}, estadoIntento={}, estadoPago={}",
                 intento.getReferencia(), intento.getWompiStatus(), intento.getEstado(), pago.getEstado());
         return ResultadoEvento.PROCESADO;
@@ -283,6 +299,9 @@ public class PagoService {
         if (pago.getReserva().getEstado() == EstadoReserva.CANCELADA) {
             log.error("Pago aprobado para reserva cancelada: pago={}, reserva={}, intento={}",
                     pago.getIdPago(), pago.getReserva().getIdReserva(), intento.getIdIntento());
+            notificacionService.alertarAdministradores("pago-cancelada:" + intento.getIdIntento(),
+                    "Pago aprobado de reserva cancelada", "Revisar el pago de la reserva cancelada.",
+                    pago.getReserva().getIdReserva(), pago.getIdPago());
         }
     }
 

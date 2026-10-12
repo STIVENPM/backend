@@ -17,6 +17,7 @@ import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
@@ -58,6 +59,7 @@ class PagoServiceTest {
     private WompiProperties properties;
     private WompiConfigurationService configurationService;
     private PagoService service;
+    private NotificacionService notificationService;
     private User owner;
     private Reserva reserva;
     private Pago pago;
@@ -79,8 +81,10 @@ class PagoServiceTest {
         properties.setEventsSecret("test_events_ficticio");
         configurationService = new WompiConfigurationService(properties);
         WompiSignatureService signatureService = new WompiSignatureService(properties, configurationService);
+        notificationService = mock(NotificacionService.class);
         service = new PagoService(pagoRepository, intentoRepository, reservaRepository,
-                accountAccessService, properties, configurationService, signatureService, transactionClient);
+                accountAccessService, properties, configurationService, signatureService, transactionClient,
+                notificationService);
         ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:5173");
 
         owner = new User();
@@ -178,6 +182,7 @@ class PagoServiceTest {
         assertEquals("APPROVED", intento.getWompiStatus());
         assertEquals(fechaPago, pago.getFechaPago());
         assertEquals(fechaConfirmacion, intento.getFechaConfirmacion());
+        verify(notificationService, times(1)).crear(any(), any(), eq("payment"), any(), any(), any(), any());
     }
 
     @Test
@@ -258,6 +263,7 @@ class PagoServiceTest {
 
         assertEquals(EstadoPago.aprobado, pago.getEstado());
         assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
+        verify(notificationService).alertarAdministradores(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -268,6 +274,7 @@ class PagoServiceTest {
 
         assertEquals(EstadoIntentoPago.aprobado_duplicado, intento.getEstado());
         assertEquals(EstadoPago.aprobado, pago.getEstado());
+        verify(notificationService).alertarAdministradores(any(), any(), any(), any(), any());
     }
 
     @Test

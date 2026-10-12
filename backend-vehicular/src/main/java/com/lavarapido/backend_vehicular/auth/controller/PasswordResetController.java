@@ -41,7 +41,8 @@ public class PasswordResetController {
             passwordResetService.solicitarRecuperacion(request.email(), ip);
         } catch (EmailDeliveryException exception) {
             // Registra el fallo SMTP sin revelar si la cuenta existe.
-            logger.warn("No fue posible enviar el correo de recuperacion ({})", exception.getClass().getSimpleName());
+            logger.warn("Password reset email delivery failed: category={}, causeType={}",
+                    exception.failureCategory(), exception.rootCauseType());
         }
 
         return ResponseEntity.ok("Si el correo está registrado, recibirás un enlace.");

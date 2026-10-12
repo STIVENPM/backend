@@ -25,6 +25,7 @@ public class ProductionReadiness {
     @Value("${spring.mail.username}") private String mailUsername;
     @Value("${spring.mail.password}") private String mailPassword;
     @Value("${spring.mail.host}") private String mailHost;
+    @Value("${app.mail.from}") private String mailFrom;
 
     public ProductionReadiness(AdminIdentityPolicy administratorIds, WompiConfigurationService wompi,
                                JdbcTemplate jdbc) {
@@ -38,7 +39,8 @@ public class ProductionReadiness {
         if (!administratorIds.isConfigured()) {
             throw new IllegalStateException("Two verified administrator IDs are required in production");
         }
-        if (blank(databasePassword) || blank(mailHost) || blank(mailUsername) || blank(mailPassword)) {
+        if (blank(databasePassword) || blank(mailHost) || blank(mailUsername) || blank(mailPassword)
+                || blank(mailFrom)) {
             throw new IllegalStateException("Production database and mail credentials are required");
         }
         try {

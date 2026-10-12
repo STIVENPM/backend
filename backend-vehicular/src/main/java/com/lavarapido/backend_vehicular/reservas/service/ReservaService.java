@@ -16,6 +16,7 @@ import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoExce
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
 import org.springframework.security.core.Authentication;
@@ -41,7 +42,8 @@ public class ReservaService {
     private final VehiculoRepository vehiculoRepository;
     private final ServicioRepository servicioRepository;
     private final AsignacionRepository asignacionRepository;
-    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; }
+    private final NotificacionService notificacionService;
+    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository, NotificacionService notificacionService) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; this.notificacionService=notificacionService; }
 
     // Comprueba dueño, disponibilidad y horario; guarda precio y duración pactados.
     @Transactional
@@ -96,7 +98,10 @@ public class ReservaService {
                 .estado(EstadoReserva.PENDIENTE)
                 .build();
 
-        return mapearAResponse(reservaRepository.save(reserva));
+        reserva = reservaRepository.save(reserva);
+        notificacionService.crear(reserva.getUsuario(), "reserva:" + reserva.getIdReserva() + ":creada",
+                "booking", "Reserva creada", "Tu reserva está pendiente.", reserva.getIdReserva(), null);
+        return mapearAResponse(reserva);
     }
 
     // Solo el dueño o un admin puede ver esta reserva.
@@ -135,11 +140,25 @@ public class ReservaService {
     // Aplica la máquina de estados y guarda marcas de tiempo.
     @Transactional
     public ReservaResponseDTO cambiarEstado(UUID idReserva, EstadoReserva nuevoEstado) {
-        Reserva reserva = reservaRepository.findById(idReserva)
+        Reserva reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
 
+        EstadoReserva anterior = reserva.getEstado();
         validarTransicion(reserva.getEstado(), nuevoEstado);
+        if (anterior == nuevoEstado) return mapearAResponse(reserva);
         reserva.setEstado(nuevoEstado);
+
+        if (nuevoEstado == EstadoReserva.CANCELADA) {
+            asignacionRepository.findByReserva_IdReserva(idReserva).ifPresent(asignacion -> {
+                if (asignacion.getEstado() == com.lavarapido.backend_vehicular.asignaciones.enums.EstadoAsignacion.asignada) {
+                    asignacion.setEstado(com.lavarapido.backend_vehicular.asignaciones.enums.EstadoAsignacion.cancelada);
+                    asignacionRepository.save(asignacion);
+                }
+                notificacionService.crear(asignacion.getOperador().getUsuario(),
+                        "reserva:" + idReserva + ":cancelada:operador", "booking",
+                        "Reserva cancelada", "La reserva asignada fue cancelada.", idReserva, null);
+            });
+        }
 
         if (nuevoEstado == EstadoReserva.EN_PROCESO && reserva.getFechaHoraInicio() == null) {
             reserva.setFechaHoraInicio(LocalDateTime.now());
@@ -149,7 +168,18 @@ public class ReservaService {
             reserva.setFechaHoraFin(LocalDateTime.now());
         }
 
-        return mapearAResponse(reservaRepository.save(reserva));
+        reserva = reservaRepository.save(reserva);
+        String titulo = switch (nuevoEstado) {
+            case ASIGNADA -> "Reserva asignada";
+            case EN_PROCESO -> "Servicio iniciado";
+            case FINALIZADA -> "Servicio finalizado";
+            case CANCELADA -> "Reserva cancelada";
+            default -> "Reserva actualizada";
+        };
+        notificacionService.crear(reserva.getUsuario(), "reserva:" + idReserva + ":" + nuevoEstado,
+                nuevoEstado == EstadoReserva.ASIGNADA || nuevoEstado == EstadoReserva.CANCELADA ? "booking" : "status",
+                titulo, titulo + ".", idReserva, null);
+        return mapearAResponse(reserva);
     }
 
     // Reutiliza la transición de estado hacia CANCELADA.

@@ -16,6 +16,7 @@ import com.lavarapido.backend_vehicular.reservas.service.ReservaService;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
+import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +39,7 @@ public class AsignacionService {
     private final OperadorRepository operadorRepository;
     private final UserRepository userRepository;
     private final ReservaService reservaService;
+    private final NotificacionService notificacionService;
 
     // =========================================================
     // CREAR ASIGNACIÓN
@@ -98,9 +100,10 @@ public class AsignacionService {
                 .estado(EstadoAsignacion.asignada)
                 .build();
 
-        return mapearAResponse(
-                asignacionRepository.save(asignacion)
-        );
+        asignacion = asignacionRepository.save(asignacion);
+        notificacionService.crear(operador.getUsuario(), "asignacion:" + asignacion.getIdAsignacion(),
+                "booking", "Nueva asignación", "Tienes una reserva asignada.", reserva.getIdReserva(), null);
+        return mapearAResponse(asignacion);
     }
 
     // =========================================================
@@ -161,6 +164,10 @@ public class AsignacionService {
 
         // Actualizar estado
         asignacion.setEstado(request.estado());
+
+        if (request.estado() == EstadoAsignacion.cancelada) {
+            reservaService.cambiarEstado(asignacion.getReserva().getIdReserva(), EstadoReserva.CANCELADA);
+        }
 
         // Si comienza el servicio
         if (request.estado() == EstadoAsignacion.en_proceso) {
@@ -244,13 +251,9 @@ public class AsignacionService {
                 ||
 
                 // EN_PROCESO -> COMPLETADA
-                // EN_PROCESO -> CANCELADA
                 (
                         estadoActual == EstadoAsignacion.en_proceso
-                                && (
-                                nuevoEstado == EstadoAsignacion.completada
-                                        || nuevoEstado == EstadoAsignacion.cancelada
-                        )
+                                && nuevoEstado == EstadoAsignacion.completada
                 );
 
         if (!permitida) {

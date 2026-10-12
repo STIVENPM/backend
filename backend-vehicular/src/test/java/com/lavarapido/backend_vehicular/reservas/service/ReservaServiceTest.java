@@ -1,12 +1,16 @@
 package com.lavarapido.backend_vehicular.reservas.service;
 
 import com.lavarapido.backend_vehicular.asignaciones.repository.AsignacionRepository;
+import com.lavarapido.backend_vehicular.asignaciones.entity.Asignacion;
+import com.lavarapido.backend_vehicular.asignaciones.enums.EstadoAsignacion;
+import com.lavarapido.backend_vehicular.operadores.entity.Operador;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaRequestDTO;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
 import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 import com.lavarapido.backend_vehicular.shared.exception.GlobalExceptionHandler;
@@ -38,6 +42,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ReservaServiceTest {
@@ -53,6 +58,7 @@ class ReservaServiceTest {
     private final VehiculoRepository vehicleRepository = mock(VehiculoRepository.class);
     private final ServicioRepository serviceRepository = mock(ServicioRepository.class);
     private final AsignacionRepository assignmentRepository = mock(AsignacionRepository.class);
+    private final NotificacionService notificationService = mock(NotificacionService.class);
 
     private final ReservaService reservationService = new ReservaService(
             reservationRepository,
@@ -60,7 +66,8 @@ class ReservaServiceTest {
             accountAccessService,
             vehicleRepository,
             serviceRepository,
-            assignmentRepository
+            assignmentRepository,
+            notificationService
     );
 
     private User user;
@@ -176,6 +183,38 @@ class ReservaServiceTest {
         assertNotNull(serviceLock);
         assertEquals(LockModeType.PESSIMISTIC_WRITE, vehicleLock.value());
         assertEquals(LockModeType.PESSIMISTIC_WRITE, serviceLock.value());
+    }
+
+    @Test
+    void repetirEstadoNoGeneraNotificacion() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.ASIGNADA);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        reservationService.cambiarEstado(reservaId, EstadoReserva.ASIGNADA);
+        verify(reservationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void cancelarReservaAsignadaCancelaAsignacionYNotificaUnaVez() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.ASIGNADA);
+        Asignacion asignacion = Asignacion.builder().reserva(reserva).estado(EstadoAsignacion.asignada).build();
+        Operador operador = new Operador(); operador.setUsuario(user); asignacion.setOperador(operador);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        when(assignmentRepository.findByReserva_IdReserva(reservaId)).thenReturn(Optional.of(asignacion));
+        when(reservationRepository.save(reserva)).thenReturn(reserva);
+        reservationService.cambiarEstado(reservaId, EstadoReserva.CANCELADA);
+        assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
+        assertEquals(EstadoAsignacion.cancelada, asignacion.getEstado());
+        verify(assignmentRepository).save(asignacion);
+        verify(notificationService, org.mockito.Mockito.times(2)).crear(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    private Reserva reserva(UUID id, EstadoReserva estado) {
+        return Reserva.builder().idReserva(id).usuario(user).vehiculo(vehicle).servicio(service)
+                .fechaReserva(RESERVATION_DATE).horaReserva(RESERVATION_TIME)
+                .precioPactado(new BigDecimal("25000")).duracionMinutosPactada(60).estado(estado).build();
     }
 
     private void assertConflictResponse(IllegalStateException exception) {

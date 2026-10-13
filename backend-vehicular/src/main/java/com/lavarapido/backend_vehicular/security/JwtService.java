@@ -29,6 +29,7 @@ public class JwtService {
     }
 
     private SecretKey getKey() {
+        // La misma clave configurada firma el token y verifica su firma despues.
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -36,6 +37,7 @@ public class JwtService {
     public String generateToken(String email) {
 
         return Jwts.builder()
+                // El subject permite al filtro buscar la cuenta por correo.
                 .subject(email)
                 .issuedAt(new Date())
                 .expiration(
@@ -56,6 +58,7 @@ public class JwtService {
     // Verifica firma y caducidad; un JWT inválido no autentica.
     public boolean isTokenValid(String token) {
         try {
+            // El parser verifica firma y expiracion antes de aceptar el contenido.
             getClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
@@ -64,6 +67,7 @@ public class JwtService {
     }
 
     private Claims getClaims(String token) {
+        // Solo se leen claims de un JWT firmado con la clave configurada.
         return Jwts.parser()
                 .verifyWith(getKey())
                 .build()

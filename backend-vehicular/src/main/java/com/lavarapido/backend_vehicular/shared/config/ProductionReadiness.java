@@ -36,14 +36,18 @@ public class ProductionReadiness {
 
     @PostConstruct
     void validate() {
+        // Solo corre con perfil prod, al crear el bean y antes de aceptar peticiones.
+        // Cada excepcion de este metodo impide levantar una API incompleta.
         if (!administratorIds.isConfigured()) {
             throw new IllegalStateException("Two verified administrator IDs are required in production");
         }
+        // Produccion requiere conexion a BD y correo de recuperacion configurados.
         if (blank(databasePassword) || blank(mailHost) || blank(mailUsername) || blank(mailPassword)
                 || blank(mailFrom)) {
             throw new IllegalStateException("Production database and mail credentials are required");
         }
         try {
+            // El enlace de la web usado en correos debe ser un origen HTTPS publico.
             if (!isHttpsOrigin(frontendUrl)) {
                 throw new IllegalArgumentException();
             }
@@ -55,11 +59,14 @@ public class ProductionReadiness {
                 .allMatch(this::isHttpsOrigin);
         if (!validOrigins || Arrays.stream(corsOrigins.split(","))
                 .map(String::trim).noneMatch(frontendUrl::equals)) {
+            // CORS solo acepta origenes HTTPS explicitos e incluye la web configurada.
             throw new IllegalStateException("Explicit HTTPS CORS origins including the frontend URL are required");
         }
+        // Revisa las cuatro credenciales Wompi antes de servir la API de produccion.
         wompi.validarWidget();
         wompi.validarConsulta();
         wompi.validarEventos();
+        // Comprueba en BD que los dos ADMIN esten activos, autorizados y sin otro rol activo.
         List<Boolean> administrators = jdbc.query("""
                 SELECT ur.fk_user_id, u.status,
                        (SELECT count(*) FROM user_roles active_roles
@@ -81,6 +88,7 @@ public class ProductionReadiness {
 
     private boolean isHttpsOrigin(String value) {
         try {
+            // Rechaza credenciales, ruta, consulta, fragmento y comodines en el origen.
             URI uri = URI.create(value);
             return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
                     && uri.getRawUserInfo() == null && uri.getRawQuery() == null

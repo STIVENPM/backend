@@ -37,6 +37,7 @@ public class PasswordResetController {
         // Captura la IP del solicitante para auditoría
         String ip = httpRequest.getRemoteAddr();
 
+        // El servicio decide si existe una cuenta activa; la respuesta pública no lo revela.
         try {
             passwordResetService.solicitarRecuperacion(request.email(), ip);
         } catch (EmailDeliveryException exception) {
@@ -45,6 +46,7 @@ public class PasswordResetController {
                     exception.failureCategory(), exception.rootCauseType());
         }
 
+        // Incluso si falla el proveedor de correo se mantiene la misma respuesta.
         return ResponseEntity.ok("Si el correo está registrado, recibirás un enlace.");
     }
 
@@ -59,6 +61,7 @@ public class PasswordResetController {
     public ResponseEntity<String> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
 
+        // El servicio verifica el token de un solo uso antes de cambiar el hash.
         passwordResetService.resetearContrasena(
             request.token(),
             request.nuevaContrasena()

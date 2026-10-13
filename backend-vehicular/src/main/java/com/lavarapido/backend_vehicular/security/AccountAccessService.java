@@ -29,6 +29,7 @@ public class AccountAccessService {
 
     // Relee la cuenta para invalidar sesiones de usuarios desactivados.
     public User activeUser(String email) {
+        // El correo del JWT o del login se contrasta con la cuenta actual en BD.
         User user = users.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid session"));
         if (!Boolean.TRUE.equals(user.getStatus())) {
@@ -43,6 +44,7 @@ public class AccountAccessService {
             throw new BadCredentialsException("Invalid session");
         }
         List<UserRole> active = roles.findAllByUser_UserIdAndStatusTrue(user.getUserId());
+        // Un rol activo ambiguo invalida la sesion; sin rol explicito queda USER.
         if (active.size() > 1) {
             throw new BadCredentialsException("Invalid role state");
         }
@@ -51,6 +53,7 @@ public class AccountAccessService {
         String role = active.get(0).getRole().getRoleName();
         return switch (role) {
             case "ADMIN" -> {
+                // Tener la fila ADMIN no basta: el UUID debe estar autorizado en configuracion.
                 if (!administratorIds.isAuthorized(user.getUserId())) {
                     throw new BadCredentialsException("Invalid role state");
                 }
@@ -68,15 +71,17 @@ public class AccountAccessService {
 
     // Exige el rol ADMIN vigente para operaciones sensibles del servicio.
     public User requireAdministrator() {
+        // El filtro JWT deja el correo autenticado en el contexto de esta peticion.
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null) {
             throw new AccessDeniedException("Administrator required");
         }
         try {
+            // Revalida cuenta y rol para no depender de permisos antiguos del token.
             User user = activeUser(authentication.getName());
             if ("ADMIN".equals(currentRole(user))) return user;
         } catch (BadCredentialsException exception) {
-            // A revoked or disabled account has no administrator authority.
+            // Una cuenta revocada o desactivada pierde los permisos de administrador.
         }
         throw new AccessDeniedException("Administrator required");
     }

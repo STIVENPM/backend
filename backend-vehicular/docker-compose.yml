@@ -1,33 +1,65 @@
+# Servicio del API Spring Boot.
 services:
+  # Contenedor que ejecuta el backend.
   backend:
+    # Construye la imagen al levantar el servicio.
     build:
+      # Usa este directorio como contexto.
       context: .
+      # Sigue las instrucciones del Dockerfile.
       dockerfile: Dockerfile
+    # Etiqueta local de la imagen construida.
     image: lava-rapido-backend:local
+    # Nombre estable para identificar el contenedor.
     container_name: lava-rapido-backend
+    # Publica el API en el puerto 8081 del equipo.
     ports:
+      # Puerto local 8081 hacia puerto 8081 del contenedor.
       - "8081:8081"
+    # Configuración que recibe Spring Boot al iniciar.
     environment:
+      # Selecciona la configuración para contenedores.
       SPRING_PROFILES_ACTIVE: docker
+      # Hace que Spring escuche en el puerto publicado.
       SERVER_PORT: "8081"
+      # Host de PostgreSQL dentro de la red compartida.
       DB_HOST: ${DB_HOST:-postgres}
+      # Puerto interno de PostgreSQL.
       DB_PORT: ${DB_PORT:-5432}
+      # Base de datos a la que se conecta el API.
       DB_NAME: ${DB_NAME:-lavarapido_db}
+      # Usuario para acceder a la base.
       DB_USERNAME: ${DB_USERNAME:-lavarapido_user}
+      # Contraseña obligatoria, tomada del entorno o .env.
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD before starting the backend}
+      # Clave obligatoria para firmar y validar tokens JWT.
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before starting the backend}
+      # UUID de los dos administradores autorizados.
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:?Set exactly two authorized administrator UUIDs}
+      # Cuenta de correo opcional para enviar mensajes.
       MAIL_USERNAME: ${MAIL_USERNAME:-}
+      # Contraseña de esa cuenta, si se configura correo.
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      # Sandbox permite probar pagos sin usar el entorno real.
       WOMPI_ENVIRONMENT: ${WOMPI_ENVIRONMENT:-sandbox}
+      # Identifica al comercio ante el widget de Wompi.
       WOMPI_PUBLIC_KEY: ${WOMPI_PUBLIC_KEY:?Set WOMPI_PUBLIC_KEY in .env}
+      # Autoriza operaciones privadas de pago con Wompi.
       WOMPI_PRIVATE_KEY: ${WOMPI_PRIVATE_KEY:?Set WOMPI_PRIVATE_KEY in .env}
+      # Permite comprobar la integridad de la transacción.
       WOMPI_INTEGRITY_SECRET: ${WOMPI_INTEGRITY_SECRET:?Set WOMPI_INTEGRITY_SECRET in .env}
+      # Permite validar eventos enviados por Wompi.
       WOMPI_EVENTS_SECRET: ${WOMPI_EVENTS_SECRET:?Set WOMPI_EVENTS_SECRET in .env}
+    # Conecta el API a la misma red que PostgreSQL.
     networks:
+      # Red donde el host postgres se puede resolver.
       - lavarapido_database
 
+# Red compartida con el proyecto de base de datos.
 networks:
+  # Alias usado arriba por el servicio backend.
   lavarapido_database:
+    # Usa una red ya creada; este Compose no la crea.
     external: true
+    # Nombre real de la red creada por el otro Compose.
     name: lavarapido-base-datos_default

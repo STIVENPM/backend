@@ -41,6 +41,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class PagoService {
+    // Orquesta inicio, consulta y confirmacion del pago. El estado real se toma
+    // de Wompi y se compara con el intento guardado antes de modificar la BD.
     private static final String COP = "COP";
     private static final Set<String> ESTADOS_WOMPI = Set.of("PENDING", "APPROVED", "DECLINED", "VOIDED", "ERROR");
 
@@ -61,6 +63,8 @@ public class PagoService {
     @Transactional
     public PagoWidgetResponseDTO iniciar(UUID idReserva) {
         configurationService.validarWidget();
+        // El bloqueo de la reserva serializa inicios concurrentes del mismo pago.
+        // Despues se verifica que el usuario sea propietario o ADMIN.
         Reserva reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         validarPropietarioOAdmin(reserva, obtenerUsuarioAutenticado());
@@ -70,6 +74,8 @@ public class PagoService {
 
         // Cobra el precio pactado al reservar, no el precio actual del servicio.
         BigDecimal monto = validarMonto(reserva.getPrecioPactado());
+        // Pago representa el cobro de la reserva; PagoIntento representa cada
+        // oportunidad de pagarlo en Wompi. Se reutiliza el pago si ya existe.
         Pago pago = pagoRepository.findByReservaIdForUpdate(idReserva).orElseGet(() ->
                 pagoRepository.save(Pago.builder()
                         .reserva(reserva)
@@ -90,9 +96,12 @@ public class PagoService {
                 .findFirstByPago_IdPagoAndEstadoOrderByCreatedAtDesc(pago.getIdPago(), EstadoIntentoPago.pendiente)
                 .orElse(null);
         if (pendiente != null) {
+            // Devolver el mismo intento conserva su referencia y evita otro widget.
             return widget(pago, pendiente, true);
         }
 
+        // Si no hay intento pendiente, se crea una referencia unica para Wompi.
+        // El ambiente queda guardado para compararlo con el evento posterior.
         PagoIntento intento = intentoRepository.save(PagoIntento.builder()
                 .pago(pago)
                 .referencia("PAGO-" + UUID.randomUUID())
@@ -107,6 +116,7 @@ public class PagoService {
     // Solo el dueño o un admin puede consultar el pago.
     @Transactional(readOnly = true)
     public PagoResponseDTO obtenerPorReserva(UUID idReserva) {
+        // El filtro HTTP autentica; aqui se controla ademas la propiedad concreta.
         Pago pago = pagoRepository.findByReserva_IdReserva(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Pago no encontrado para la reserva"));
         validarPropietarioOAdmin(pago.getReserva(), obtenerUsuarioAutenticado());
@@ -116,6 +126,8 @@ public class PagoService {
     // Acepta solo eventos Wompi del tipo y ambiente esperados.
     @Transactional
     public ResultadoEvento procesarEvento(JsonNode evento) {
+        // PagoController ya valido la firma del webhook antes de llegar aqui.
+        // Los eventos de otro tipo o ambiente se ignoran sin cambiar el pago.
         String tipo = evento.path("event").asString();
         if (!"transaction.updated".equals(tipo)) {
             log.info("Evento Wompi firmado ignorado: tipo={}", tipo.isBlank() ? "ausente" : tipo);
@@ -127,6 +139,7 @@ public class PagoService {
             return ResultadoEvento.IGNORADO;
         }
         JsonNode transaction = evento.path("data").path("transaction");
+        // Un evento de actualizacion sin objeto transaction no se puede conciliar.
         if (!transaction.isObject()) {
             throw new WompiEventoInvalidoException("El evento no contiene una transaccion valida");
         }
@@ -136,6 +149,8 @@ public class PagoService {
     // Solo un admin consulta en Wompi intentos pendientes conocidos.
     @Transactional
     public PagoResponseDTO reconciliar(UUID idReserva) {
+        // Camino manual para ADMIN: pregunta a Wompi por intentos pendientes
+        // que ya tengan ID remoto, por si el webhook no llego o se retraso.
         User usuario = obtenerUsuarioAutenticado();
         if (!esAdmin(usuario)) {
             throw new AccessDeniedException("Solo ADMIN puede reconciliar pagos con Wompi");
@@ -153,6 +168,8 @@ public class PagoService {
         }
 
         for (PagoIntento intento : pendientes) {
+            // No se acepta cualquier respuesta remota: su referencia debe ser
+            // la del intento local y se bloquea ese intento antes de actualizarlo.
             JsonNode transaction = transactionClient.consultar(intento.getWompiTransactionId());
             String reference = textoTransaccion(transaction, "reference", null);
             if (!intento.getReferencia().equals(reference)) {
@@ -168,6 +185,8 @@ public class PagoService {
     // Consulta la transacción en Wompi y compara ID y referencia.
     @Transactional
     public PagoResponseDTO verificar(UUID idReserva, String referencia, String transactionId) {
+        // El navegador aporta IDs, pero el servidor consulta directamente a Wompi.
+        // Primero se valida longitud, pertenencia de reserva e intento local.
         if (referencia == null || referencia.isBlank() || referencia.length() > 100
                 || transactionId == null || transactionId.isBlank() || transactionId.length() > 100) {
             throw new IllegalArgumentException("Referencia o identificador de transaccion no valido");
@@ -180,6 +199,8 @@ public class PagoService {
 
         JsonNode transaction = transactionClient.consultar(transactionId);
         TransaccionWompi datos = leerTransaccion(transaction);
+        // ID y referencia remotos deben coincidir con lo solicitado; solo
+        // entonces se bloquea el intento y se aplican los cambios de estado.
         if (!transactionId.equals(datos.id()) || !referencia.equals(datos.referencia())) {
             throw new WompiEventoInvalidoException("La transaccion consultada no coincide con el intento local");
         }
@@ -194,6 +215,8 @@ public class PagoService {
 
     private ResultadoEvento procesarTransaccion(JsonNode transaction, String ambiente) {
         TransaccionWompi datos = leerTransaccion(transaction);
+        // El webhook localiza el intento por la referencia firmada por Wompi.
+        // Si no es un intento nuestro, se registra y se ignora sin crear pagos.
         PagoIntento intento = intentoRepository.findByReferenciaForUpdate(datos.referencia())
                 .orElse(null);
         if (intento == null) {
@@ -205,6 +228,7 @@ public class PagoService {
 
     private ResultadoEvento aplicarTransaccion(PagoIntento intento, TransaccionWompi datos, String ambiente) {
         // Estos datos vienen de Wompi; deben coincidir con el intento local antes de aprobar.
+        // La misma validacion se reutiliza para webhook, verificacion y reconciliacion.
         if (!intento.getWompiEnvironment().equals(ambiente)) {
             throw new WompiEventoInvalidoException("El ambiente de la transaccion no coincide con el intento");
         }
@@ -215,6 +239,8 @@ public class PagoService {
         if (!COP.equals(datos.moneda())) {
             throw new WompiEventoInvalidoException("La moneda recibida de Wompi no es COP");
         }
+        // Un ID de Wompi o metodo ya vinculado no puede cambiar ni reutilizarse
+        // en otro intento: protege la correspondencia entre cobro e intento.
         if (intento.getWompiTransactionId() != null
                 && !intento.getWompiTransactionId().equals(datos.id())) {
             throw new PagoConflictException("El intento ya esta asociado a otra transaccion Wompi");
@@ -230,9 +256,11 @@ public class PagoService {
         }
 
         if (esEventoRepetido(intento, datos)) {
+            // Reenvios identicos son normales: no vuelven a cambiar estados.
             return ResultadoEvento.DUPLICADO;
         }
         if (esIntentoAprobado(intento) && !"APPROVED".equals(datos.estado())) {
+            // Un evento tardio no puede bajar un intento ya aprobado.
             log.warn("Evento Wompi tardio ignorado para intento aprobado: referencia={}, estado={}",
                     intento.getReferencia(), datos.estado());
             return ResultadoEvento.IGNORADO;
@@ -243,6 +271,8 @@ public class PagoService {
         Pago pago = pagoRepository.findByIdForUpdate(intento.getPago().getIdPago())
                 .orElseThrow(() -> new PagoConflictException("El pago asociado al intento no existe"));
 
+        // Primero se refleja el estado remoto en intento y pago; PENDING no
+        // revive un intento finalizado. Todo ocurre en la transaccion actual.
         EstadoIntentoPago estadoAnterior = intento.getEstado();
         switch (datos.estado()) {
             case "APPROVED" -> aprobar(intento, pago);
@@ -279,6 +309,8 @@ public class PagoService {
     private void aprobar(PagoIntento intento, Pago pago) {
         LocalDateTime ahora = LocalDateTime.now();
         intento.setWompiStatus("APPROVED");
+        // Si otro intento ya aprobo este pago, registra el nuevo como posible
+        // cobro duplicado para investigarlo, sin reemplazar el pago aprobado.
         if (pago.getEstado() == EstadoPago.aprobado && intento.getEstado() != EstadoIntentoPago.aprobado) {
             intento.setEstado(EstadoIntentoPago.aprobado_duplicado);
             if (intento.getFechaConfirmacion() == null) {
@@ -293,6 +325,8 @@ public class PagoService {
             intento.setFechaConfirmacion(ahora);
         }
         pago.setEstado(EstadoPago.aprobado);
+        // La confirmacion actualiza pago e intento; este metodo no cambia
+        // directamente el estado de la reserva asociada.
         if (pago.getFechaPago() == null) {
             pago.setFechaPago(ahora);
         }
@@ -306,6 +340,8 @@ public class PagoService {
     }
 
     private void rechazar(PagoIntento intento, Pago pago, String estadoWompi) {
+        // El intento termina rechazado. Un rechazo posterior nunca revoca
+        // un pago que otro intento ya dejo aprobado.
         intento.setWompiStatus(estadoWompi);
         intento.setEstado(EstadoIntentoPago.rechazado);
         intento.setFechaConfirmacion(LocalDateTime.now());
@@ -315,6 +351,7 @@ public class PagoService {
     }
 
     private boolean esEventoRepetido(PagoIntento intento, TransaccionWompi datos) {
+        // Compara ID, estado y metodo para reconocer un reenvio exacto.
         return datos.id().equals(intento.getWompiTransactionId())
                 && datos.estado().equals(intento.getWompiStatus())
                 && datos.metodo().equals(intento.getWompiPaymentMethodType());
@@ -326,6 +363,8 @@ public class PagoService {
     }
 
     private TransaccionWompi leerTransaccion(JsonNode transaction) {
+        // Normaliza nombres de campos y mayusculas del JSON externo; si falta
+        // un dato obligatorio, se rechaza antes de tocar entidades persistidas.
         String id = textoTransaccion(transaction, "id", null);
         String referencia = textoTransaccion(transaction, "reference", null);
         String moneda = textoTransaccion(transaction, "currency", null).toUpperCase(Locale.ROOT);
@@ -362,6 +401,8 @@ public class PagoService {
     }
 
     private PagoWidgetResponseDTO widget(Pago pago, PagoIntento intento, boolean reutilizado) {
+        // Entrega a la web referencia, centavos, llave publica y firma de
+        // integridad. Los secretos privados permanecen en el backend.
         long centavos = montoEnCentavos(pago.getMonto());
         return new PagoWidgetResponseDTO(
                 pago.getIdPago(), intento.getIdIntento(), pago.getReserva().getIdReserva(), intento.getReferencia(),
@@ -371,6 +412,8 @@ public class PagoService {
     }
 
     private PagoResponseDTO response(Pago pago) {
+        // La respuesta muestra el intento mas reciente y el historial completo
+        // para que la web pueda explicar reintentos o estados previos.
         List<PagoIntentoResponseDTO> intentos = intentoRepository.findByPago_IdPagoOrderByCreatedAtAsc(pago.getIdPago())
                 .stream().map(this::response).toList();
         PagoIntentoResponseDTO actual = intentos.isEmpty() ? null : intentos.get(intentos.size() - 1);
@@ -386,6 +429,7 @@ public class PagoService {
     }
 
     private BigDecimal validarMonto(BigDecimal monto) {
+        // El precio pactado debe ser entero positivo en COP antes de firmarlo.
         if (monto == null || monto.signum() <= 0 || monto.stripTrailingZeros().scale() > 0) {
             throw new IllegalStateException("El precio del servicio debe ser un valor positivo entero en COP");
         }
@@ -394,6 +438,7 @@ public class PagoService {
     }
 
     private long montoEnCentavos(BigDecimal monto) {
+        // Wompi recibe centavos; longValueExact evita truncar o desbordar.
         try {
             return monto.movePointRight(2).longValueExact();
         } catch (ArithmeticException exception) {
@@ -402,6 +447,7 @@ public class PagoService {
     }
 
     private User obtenerUsuarioAutenticado() {
+        // Lee el correo puesto por el filtro JWT y vuelve a validar la cuenta.
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
             throw new IllegalArgumentException("Usuario no autenticado");
@@ -410,6 +456,7 @@ public class PagoService {
     }
 
     private void validarPropietarioOAdmin(Reserva reserva, User usuario) {
+        // La autenticacion por si sola no autoriza a consultar pagos ajenos.
         if (!reserva.getUsuario().getUserId().equals(usuario.getUserId()) && !esAdmin(usuario)) {
             throw new AccessDeniedException("No tienes permiso para acceder al pago de esta reserva");
         }
@@ -422,6 +469,8 @@ public class PagoService {
     private record TransaccionWompi(
             String id, String referencia, long montoEnCentavos, String moneda, String metodo, String estado) { }
 
+    // El controlador usa este resultado para distinguir actualizacion real,
+    // reenvio identico y evento firmado que no corresponde procesar aqui.
     public enum ResultadoEvento {
         PROCESADO,
         DUPLICADO,

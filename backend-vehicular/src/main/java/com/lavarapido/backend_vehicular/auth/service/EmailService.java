@@ -52,6 +52,7 @@ public class EmailService {
     }
 
     public void enviarCorreoRecuperacion(String destinatario, String tokenPlano) {
+        // El enlace apunta al frontend; el token se codifica para viajar en la URL.
         String frontendBase = appFrontendUrl.endsWith("/")
                 ? appFrontendUrl.substring(0, appFrontendUrl.length() - 1)
                 : appFrontendUrl;
@@ -67,6 +68,7 @@ public class EmailService {
                 "Si no solicitaste esto, ignora este correo.\n\n" +
                 "– Equipo Lava Rápido Vehicular";
 
+        // Brevo recibe remitente, destinatario y mensaje; la clave API va en el encabezado.
         String json = objectMapper.writeValueAsString(Map.of(
                 "sender", Map.of("email", mailFrom),
                 "to", List.of(Map.of("email", destinatario)),
@@ -88,6 +90,7 @@ public class EmailService {
 
         try {
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            // Un estado distinto de 2xx significa que el proveedor no aceptó el envío.
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new EmailDeliveryException("No fue posible enviar el correo de recuperacion",
                         new IOException("Brevo HTTP status " + response.statusCode()));

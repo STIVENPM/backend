@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.List;
 
+/** Devuelve el pago de una reserva, su intento actual y el historial de intentos. */
 public record PagoResponseDTO(
         UUID idPago,
         UUID idReserva,

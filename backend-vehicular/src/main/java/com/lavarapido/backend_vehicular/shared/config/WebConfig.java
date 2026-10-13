@@ -8,9 +8,12 @@ import java.util.Arrays;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/** Configura que origenes web pueden llamar a la API desde un navegador.
+ * El control de acceso por rol sigue ocurriendo en SecurityConfig. */
 @Configuration
 public class WebConfig {
 
+    // Separa varios origenes con coma; en desarrollo, Vite usa localhost:5173.
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
 
@@ -24,6 +27,7 @@ public class WebConfig {
                     CorsRegistry registry
             ) {
 
+                // Aplica la politica CORS a todas las rutas HTTP del backend.
                 registry.addMapping("/**")
 
                         // 🔓 ORÍGENES PERMITIDOS
@@ -38,6 +42,7 @@ public class WebConfig {
 
                         // 🔓 HEADERS PERMITIDOS
                         .allowedHeaders(
+                                // Authorization permite que el navegador envie el JWT Bearer.
                                 "Authorization",
                                 "Content-Type",
                                 "Accept"

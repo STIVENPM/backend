@@ -41,18 +41,16 @@ public class UserService {
         // Rechaza una contraseña inválida antes de crear la entidad.
         PasswordRules.requireValid(dto.getPassword());
 
-        // verifica disponibilidad del correo para evitar duplicados
-        // antes de intentar guardar en la base de datos
+        // Comprueba el correo antes del guardado; la columna UNIQUE de BD también
+        // impide duplicados si dos registros llegan al mismo tiempo.
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new IllegalStateException("El correo ya esta registrado");
         }
 
-        // se crea una nueva instancia de la entidad User
-        // que sera persistida en la tabla users
+        // La nueva cuenta nace activa; sin un rol explícito se tratará como USER.
         User user = new User();
 
-        // transferencia manual de datos desde el DTO hacia la entidad
-        // este proceso se conoce como mapeo manual
+        // Mapea los datos permitidos del DTO; el cliente no asigna estado ni rol.
         user.setEmail(dto.getEmail());
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
@@ -73,6 +71,7 @@ public class UserService {
     // Compara la contraseña enviada con el hash guardado y emite el JWT.
 public LoginResponseDTO login(LoginDTO dto) {
 
+    // Cuenta ausente o desactivada devuelve el mismo error para no revelar su estado.
     User user = userRepository.findByEmail(dto.getEmail())
             .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
     if (!Boolean.TRUE.equals(user.getStatus())) {
@@ -92,6 +91,7 @@ public LoginResponseDTO login(LoginDTO dto) {
     // El rol se lee de las asignaciones activas, no de lo enviado por el cliente.
     String roleName = accountAccessService.currentRole(user);
 
+    // Solo después de validar contraseña y rol se firma el JWT de una hora.
     String token = jwtService.generateToken(user.getEmail());
 
     LoginResponseDTO.UserInfoDTO info =

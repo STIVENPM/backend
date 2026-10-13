@@ -40,14 +40,17 @@ public class SecurityConfig {
     ) throws Exception {
 
         http
+            // Las rutas protegidas usan JWT; el servidor no mantiene una sesion de login.
             // =========================================================
             // CORS
             // =========================================================
+            // Usa los origenes y headers permitidos que define WebConfig.
             .cors(Customizer.withDefaults())
 
             // =========================================================
             // CSRF
             // =========================================================
+            // La API usa JWT en Authorization y no una sesion de navegador con cookie.
             .csrf(csrf -> csrf.disable())
 
             // =========================================================
@@ -69,7 +72,9 @@ public class SecurityConfig {
             // DESHABILITAR HTTP BASIC
             // =========================================================
             .httpBasic(basic -> basic.disable())
+            // Estas respuestas son de la cadena de seguridad, antes del controlador.
             .exceptionHandling(exceptions -> exceptions
+                // 401 = falta autenticacion; 403 = identidad autenticada sin permiso.
                 .authenticationEntryPoint((request, response, exception) ->
                     response.sendError(401, "Sesion invalida"))
                 .accessDeniedHandler((request, response, exception) ->
@@ -79,10 +84,13 @@ public class SecurityConfig {
             // AUTORIZACIÓN
             // =========================================================
             .authorizeHttpRequests(auth -> auth
+                // Las reglas se evalúan en orden: las rutas especificas van primero.
 
                 // =====================================================
                 // ENDPOINTS PÚBLICOS
                 // =====================================================
+                // Registro, login y recuperación deben poder llamarse antes de tener un JWT.
+                // permitAll omite la exigencia de autenticacion para estas rutas.
                 .requestMatchers(
                     "/api/users/login",
                     "/api/users/register",
@@ -98,9 +106,11 @@ public class SecurityConfig {
 
                     "/error"
                 ).permitAll()
+                // Salud publica para diagnosticar el backend sin iniciar sesion.
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 
                 // Wompi does not send JWT; integrity is checked in PagoController.
+                // El webhook queda publico en esta capa para permitir la entrega externa.
                 .requestMatchers(HttpMethod.POST, "/api/pagos/webhook").permitAll()
 
 
@@ -109,6 +119,7 @@ public class SecurityConfig {
                 // =====================================================
 
                 // Buscar marcas -> ADMIN
+                // hasRole("ADMIN") exige ROLE_ADMIN, creada desde el rol vigente en BD.
                 .requestMatchers(
                     "/api/marcas/pendientes",
                     "/api/marcas/buscar"
@@ -223,6 +234,7 @@ public class SecurityConfig {
 
 
                 // Cancelar reserva -> AUTENTICADO
+                // Esta ruta concreta aparece antes del PATCH general reservado a ADMIN.
                 .requestMatchers(
                     HttpMethod.PATCH,
                     "/api/reservas/*/cancelar"
@@ -260,6 +272,7 @@ public class SecurityConfig {
                 // =====================================================
                 // OPERADORES
                 // =====================================================
+                // La gestion de operadores queda reservada a administradores.
                 .requestMatchers(
                     "/api/operadores",
                     "/api/operadores/**"
@@ -275,6 +288,7 @@ public class SecurityConfig {
 
                 // Calificaciones: el servicio valida propietario o ADMIN
                 // cuando se consulta una reserva concreta.
+                // La autenticacion aqui no reemplaza la comprobacion de propiedad en servicio.
                 .requestMatchers(
                     "/api/calificaciones/**"
                 ).authenticated()
@@ -283,6 +297,7 @@ public class SecurityConfig {
                 // =====================================================
                 // ASIGNACIONES
                 // =====================================================
+                // ADMIN crea asignaciones; OPERATOR consulta y actualiza las suyas.
                 .requestMatchers(
                     HttpMethod.POST,
                     "/api/asignaciones"
@@ -308,6 +323,7 @@ public class SecurityConfig {
                 // =====================================================
                 // CUALQUIER OTRO ENDPOINT
                 // =====================================================
+                // Cualquier ruta no enumerada aun necesita una identidad autenticada.
                .anyRequest().authenticated() 
             )
 
@@ -316,6 +332,7 @@ public class SecurityConfig {
             // JWT FILTER
             // =========================================================
             .addFilterBefore(
+                // Valida el Bearer antes de que Spring decida los permisos de la ruta.
                 jwtFilter,
                 UsernamePasswordAuthenticationFilter.class
             );
@@ -330,6 +347,7 @@ public class SecurityConfig {
     // =============================================================
     @Bean
     public PasswordEncoder passwordEncoder() {
+        // UserService usa este encoder al guardar y comprobar contrasenas.
         return new BCryptPasswordEncoder();
     }
 
@@ -339,6 +357,7 @@ public class SecurityConfig {
     // =============================================================
     @Bean
     public UserDetailsService userDetailsService() {
+        // El login propio consulta users en BD; este almacen en memoria inicia vacio.
         return new InMemoryUserDetailsManager();
     }
 }

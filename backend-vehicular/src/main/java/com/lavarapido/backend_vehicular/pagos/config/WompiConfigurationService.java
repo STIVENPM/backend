@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.Locale;
 
+/** Relaciona ambiente, URL y prefijos de claves Wompi.
+ * La validacion ocurre cuando un flujo de pagos necesita cada tipo de clave. */
 @Component
 @RequiredArgsConstructor
 public class WompiConfigurationService {
@@ -13,6 +15,7 @@ public class WompiConfigurationService {
 
     // Comprueba llave pública y secreto de integridad del ambiente elegido.
     public void validarWidget() {
+        // Antes de iniciar un pago, exige llaves del mismo ambiente que el widget.
         Ambiente ambiente = ambiente();
         validarPrefijo(properties.getPublicKey(), ambiente.publicKeyPrefix, "llave publica");
         validarPrefijo(properties.getIntegritySecret(), ambiente.integrityPrefix, "secreto de integridad");
@@ -20,12 +23,14 @@ public class WompiConfigurationService {
 
     // Comprueba el secreto usado para verificar webhooks.
     public void validarEventos() {
+        // Antes de aceptar un webhook, exige el secreto de eventos del ambiente activo.
         Ambiente ambiente = ambiente();
         validarPrefijo(properties.getEventsSecret(), ambiente.eventsPrefix, "secreto de eventos");
     }
 
     // Comprueba la llave privada usada para consultar transacciones.
     public void validarConsulta() {
+        // La consulta del estado remoto usa la llave privada, solo del lado servidor.
         Ambiente ambiente = ambiente();
         validarPrefijo(properties.getPrivateKey(), ambiente.privateKeyPrefix, "llave privada");
     }
@@ -41,6 +46,7 @@ public class WompiConfigurationService {
     }
 
     private Ambiente ambiente() {
+        // Normaliza alias de configuracion; un valor desconocido corta el flujo de pagos.
         String configured = properties.getEnvironment();
         if (configured == null) {
             throw new WompiConfiguracionException("No esta configurado el ambiente de Wompi");
@@ -53,6 +59,7 @@ public class WompiConfigurationService {
     }
 
     private void validarPrefijo(String value, String prefix, String field) {
+        // Un prefijo incorrecto suele indicar mezcla de credenciales test y produccion.
         if (value == null || value.isBlank()) {
             throw new WompiConfiguracionException("No esta configurado " + field + " de Wompi");
         }
@@ -62,6 +69,7 @@ public class WompiConfigurationService {
     }
 
     private enum Ambiente {
+        // Centraliza URL, prefijos y nombre de evento para cada ambiente Wompi.
         SANDBOX("test", "https://sandbox.wompi.co/v1", "pub_test_", "prv_test_", "test_integrity_", "test_events_"),
         PRODUCTION("prod", "https://production.wompi.co/v1", "pub_prod_", "prv_prod_", "prod_integrity_", "prod_events_");
 

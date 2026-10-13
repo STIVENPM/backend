@@ -35,6 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Ignorar solicitudes OPTIONS de CORS
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            // El preflight se deja pasar sin exigir token.
             filterChain.doFilter(request, response);
             return;
         }
@@ -44,6 +45,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Si no existe token, continuar como usuario anónimo
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // La regla de SecurityConfig decide despues si esta ruta admite anonimos.
             filterChain.doFilter(request, response);
             return;
         }
@@ -53,6 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Validar el JWT
         if (!jwtService.isTokenValid(token)) {
+            // Una firma o caducidad invalida corta la peticion antes del controlador.
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Token invalido");
             return;
@@ -60,13 +63,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Extraer información del JWT
         String email = jwtService.extractEmail(token);
-        // The signed token identifies the account; its old role claim is never trusted.
+        // El JWT firmado identifica la cuenta; el rol se vuelve a consultar en BD.
         final User user;
         final String role;
         try {
+            // El rol se consulta en BD en cada peticion; no se toma del JWT.
             user = accountAccessService.activeUser(email);
             role = accountAccessService.currentRole(user);
         } catch (AuthenticationException exception) {
+            // Cuenta desactivada o rol invalido: se borra el contexto y se responde 401.
             SecurityContextHolder.clearContext();
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Sesion invalida");
@@ -84,6 +89,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Crear la autenticación del usuario
         UsernamePasswordAuthenticationToken auth =
+                // El principal es el correo; la contrasena ya no viaja en esta peticion.
                 new UsernamePasswordAuthenticationToken(
                         email,
                         null,

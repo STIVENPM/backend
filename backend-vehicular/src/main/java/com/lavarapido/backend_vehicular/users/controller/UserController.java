@@ -24,14 +24,14 @@ public class UserController {
     public UserController(UserService userService) { this.userService = userService; }
 
     //  REGISTRO
-    // Recibe el registro validado y devuelve 201.
+    // @Valid revisa el JSON antes de entrar al servicio; 201 confirma la cuenta creada.
     @PostMapping("/register")
     public ResponseEntity<UserRegistrationResponseDTO> register(@Valid @RequestBody UserRegistrationDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.registerUser(dto));
     }
 
     //  LOGIN
-    // Envía las credenciales al servicio y devuelve token y usuario.
+    // El servicio comprueba las credenciales y devuelve el JWT junto a datos públicos.
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginDTO dto) {
         return ResponseEntity.ok(userService.login(dto));

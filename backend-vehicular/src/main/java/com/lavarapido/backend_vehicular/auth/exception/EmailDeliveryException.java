@@ -13,7 +13,7 @@ public class EmailDeliveryException extends RuntimeException {
         if (type.contains("ssl") || type.contains("tls")) return "tls";
         if (type.contains("connect")) return "connection";
         if (type.contains("timeout")) return "timeout";
-        return "smtp";
+        return "delivery";
     }
 
     public String rootCauseType() {

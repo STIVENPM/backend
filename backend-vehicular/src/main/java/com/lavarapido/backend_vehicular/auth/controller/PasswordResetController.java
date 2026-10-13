@@ -40,7 +40,7 @@ public class PasswordResetController {
         try {
             passwordResetService.solicitarRecuperacion(request.email(), ip);
         } catch (EmailDeliveryException exception) {
-            // Registra el fallo SMTP sin revelar si la cuenta existe.
+            // Registra solo el tipo de fallo de entrega, sin revelar si la cuenta existe.
             logger.warn("Password reset email delivery failed: category={}, causeType={}",
                     exception.failureCategory(), exception.rootCauseType());
         }

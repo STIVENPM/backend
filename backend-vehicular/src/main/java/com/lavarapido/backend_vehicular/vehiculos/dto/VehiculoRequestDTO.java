@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
+/** Recibe placa, color, tipo y marca del vehículo que se quiere registrar o actualizar. */
 public record VehiculoRequestDTO(
 
     // Placa: acepta formato antiguo (ABC123) o nuevo (ABC12A).

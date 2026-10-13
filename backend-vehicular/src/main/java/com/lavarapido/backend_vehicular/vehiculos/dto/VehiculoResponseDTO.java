@@ -6,6 +6,7 @@ import com.lavarapido.backend_vehicular.vehiculos.enums.TipoVehiculo;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/** Devuelve el vehículo con datos de su dueño, marca, estado y fecha de creación. */
 public record VehiculoResponseDTO(
     UUID idVehiculo,
     UUID userId,

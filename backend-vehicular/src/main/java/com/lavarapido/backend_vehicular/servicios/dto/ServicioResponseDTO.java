@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 
+/** Devuelve los datos del servicio, su estado y fechas de creación y actualización. */
 public class ServicioResponseDTO {
 
     private UUID idServicio;

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+/** Recibe los datos de una cuenta nueva; el servicio valida y guarda un hash de la contraseña. */
 public class UserRegistrationDTO {
 
     @NotBlank @Email @Size(max = 100)

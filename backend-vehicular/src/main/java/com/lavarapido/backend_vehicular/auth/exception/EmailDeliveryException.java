@@ -1,5 +1,6 @@
 package com.lavarapido.backend_vehicular.auth.exception;
 
+/** Falla el envio de recuperacion; conserva la causa y responde HTTP 503. */
 public class EmailDeliveryException extends RuntimeException {
 
     public EmailDeliveryException(String message, Throwable cause) {

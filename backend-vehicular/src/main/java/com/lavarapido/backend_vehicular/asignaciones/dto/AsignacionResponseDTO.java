@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
+/** Devuelve la asignación con datos de cliente, vehículo, servicio y reserva para mostrarla sin consultas adicionales. */
 public record AsignacionResponseDTO(
 
         // =========================================================

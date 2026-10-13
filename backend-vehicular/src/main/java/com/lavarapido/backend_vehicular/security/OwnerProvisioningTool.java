@@ -20,6 +20,7 @@ public final class OwnerProvisioningTool {
                          String phone, String documentType, String documentNumber, String hash) { }
 
     public static void main(String[] args) throws Exception {
+        // Se ejecuta aparte del servidor y exige una consola para pedir contrasenas.
         Console console = System.console();
         if (console == null) throw new IllegalStateException("Se requiere una terminal interactiva.");
         String url = requiredEnv("DB_JDBC_URL");
@@ -30,12 +31,14 @@ public final class OwnerProvisioningTool {
         Owner second = readOwner(console, 2);
         if (first.id().equals(second.id()) || first.email().equalsIgnoreCase(second.email())
                 || first.documentNumber().equals(second.documentNumber())) {
+            // Impide aprovisionar dos perfiles que representen la misma identidad.
             throw new IllegalArgumentException("Los dos perfiles deben ser distintos.");
         }
         try (Connection connection = DriverManager.getConnection(url, username, databasePassword)) {
             connection.setAutoCommit(false);
             try {
                 try (Statement statement = connection.createStatement()) {
+                    // El bloqueo protege la comprobacion de tabla vacia frente a inserciones simultaneas.
                     statement.execute("LOCK TABLE users, user_roles IN SHARE ROW EXCLUSIVE MODE");
                     try (ResultSet rows = statement.executeQuery("SELECT count(*) FROM users")) {
                         rows.next();
@@ -45,6 +48,7 @@ public final class OwnerProvisioningTool {
                     }
                 }
                 UUID adminRole = adminRole(connection);
+                // Ambos usuarios y sus roles se escriben dentro de la misma transaccion.
                 insertOwner(connection, first, adminRole);
                 insertOwner(connection, second, adminRole);
                 try (PreparedStatement check = connection.prepareStatement("""
@@ -57,6 +61,7 @@ public final class OwnerProvisioningTool {
                 connection.commit();
                 console.printf("Se aprovisionaron exactamente dos perfiles ADMIN con los UUID indicados.%n");
             } catch (Exception exception) {
+                // Cualquier fallo revierte usuarios y roles creados en esta ejecucion.
                 connection.rollback();
                 throw exception;
             }
@@ -87,9 +92,11 @@ public final class OwnerProvisioningTool {
                     || plaintext.getBytes(StandardCharsets.UTF_8).length > 72) {
                 throw new IllegalArgumentException("La contraseña no cumple los requisitos.");
             }
+            // Guarda el hash BCrypt, nunca la contrasena ingresada en la tabla users.
             return new Owner(id, email, firstName, lastName, phone, documentType,
                     documentNumber, new BCryptPasswordEncoder(12).encode(plaintext));
         } finally {
+            // Borra los arreglos de caracteres aun cuando la validacion falle.
             Arrays.fill(password, '\0');
             Arrays.fill(confirmation, '\0');
         }

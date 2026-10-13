@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+/** Recibe nombre, descripción, precio y duración para crear o actualizar un servicio. */
 public class ServicioRequestDTO {
 
     @NotBlank(message = "El nombre es obligatorio")

@@ -41,9 +41,12 @@ public class PasswordResetService {
     @Transactional
     public void solicitarRecuperacion(String email, String ipSolicitante) {
 
+        // Se termina sin error si el correo no existe o la cuenta está inactiva:
+        // el controlador dará la misma respuesta y no permite enumerar cuentas.
         User usuario = userRepository.findByEmail(email).orElse(null);
         if (usuario == null || !Boolean.TRUE.equals(usuario.getStatus())) return;
 
+        // El valor aleatorio viaja por correo; la base solo conserva su SHA-256.
         String tokenPlano = generarTokenSeguro();
         String tokenHash = hashearSHA256(tokenPlano);
 
@@ -54,10 +57,12 @@ public class PasswordResetService {
         token.setUsado(false);
         token.setIpSolicitante(ipSolicitante);
         // Persiste el hash; el token plano solo se envía en el enlace.
+        // Una nueva solicitud invalida los tokens anteriores de esta cuenta.
         tokenRepository.invalidarTokensActivosPorUsuario(usuario.getUserId());
         tokenRepository.saveAndFlush(token);
 
         try {
+            // Si el envío falla, la excepción revierte esta transacción y el token nuevo.
             emailService.enviarCorreoRecuperacion(usuario.getEmail(), tokenPlano);
         } catch (MailException | IllegalStateException exception) {
             throw new EmailDeliveryException("No fue posible enviar el correo de recuperacion", exception);
@@ -83,6 +88,7 @@ public class PasswordResetService {
         String tokenHash = hashearSHA256(tokenPlano);
 
         // Busca el token en BD
+        // La consulta bloquea la fila durante la transacción para evitar dos usos simultáneos.
         TokenRecuperacion token = tokenRepository.findByTokenHash(tokenHash)
             .orElseThrow(() -> new IllegalArgumentException("Token invalido"));
 
@@ -101,7 +107,8 @@ public class PasswordResetService {
         usuario.setPassword(passwordEncoder.encode(nuevaContrasena));
         userRepository.save(usuario);
 
-        // Marca el token como usado para que no pueda reutilizarse
+        // Contraseña y marca de uso se guardan en la misma transacción.
+        // El token no podrá reutilizarse después de confirmar el cambio.
         token.setUsado(true);
         tokenRepository.save(token);
     }

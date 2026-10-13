@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.UUID;
 
+/** Recibe vehículo, servicio, fecha y hora solicitados para crear una reserva. */
 public class ReservaRequestDTO {
 
     @NotNull(message = "El vehículo es obligatorio")

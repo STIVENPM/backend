@@ -1,13 +1,21 @@
+# Git no es necesario para construir la imagen.
 .git
+# Reglas de Git, innecesarias dentro del contexto.
 .gitignore
+# Ajustes locales de IntelliJ.
 .idea
+# Ajustes locales de VS Code.
 .vscode
+# El wrapper descargará su JAR si hace falta.
 .mvn/wrapper/maven-wrapper.jar
+# Evita copiar compilaciones anteriores.
 target
+# Excluye registros locales de ejecución.
 *.log
+# No envía secretos locales a Docker.
 .env
+# Configuración local de Spring fuera de la imagen.
 application-local.properties
+# Configuración local de Wompi fuera de la imagen.
 application-wompi-local.properties
-BACKEND_STATUS.md
-WOMPI_FRONTEND_CONTRACT.md
-WOMPI_LOCAL_DIAGNOSTICO.md
+

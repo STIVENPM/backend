@@ -3,6 +3,7 @@ package com.lavarapido.backend_vehicular.users.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/** Recibe los datos editables del perfil; no permite cambiar correo, rol ni contraseña. */
 public class UserProfileUpdateDTO {
 
     @NotBlank(message = "El nombre es obligatorio")

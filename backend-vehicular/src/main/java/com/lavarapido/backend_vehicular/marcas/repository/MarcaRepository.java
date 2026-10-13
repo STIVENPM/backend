@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/** Consulta el catálogo de marcas y distingue las aprobadas de las pendientes. */
 public interface MarcaRepository extends JpaRepository<Marca, UUID> {
 
     // Para validar unicidad al crear/sugerir una marca (evita duplicados

@@ -4,6 +4,7 @@ package com.lavarapido.backend_vehicular.marcas.dto;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/** Devuelve la marca, su estado y, si fue sugerida, los datos del usuario solicitante. */
 public record MarcaResponseDTO(
     UUID idMarca,
     String nombre,

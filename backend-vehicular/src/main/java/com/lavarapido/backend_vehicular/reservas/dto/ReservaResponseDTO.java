@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
+/** Devuelve la reserva con usuario, vehículo, servicio, horario, estado y operador asignado. */
 public class ReservaResponseDTO {
 
     private UUID idReserva;

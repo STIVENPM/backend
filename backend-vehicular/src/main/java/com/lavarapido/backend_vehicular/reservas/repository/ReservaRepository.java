@@ -14,8 +14,10 @@ import java.util.UUID;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
 
+/** Consulta reservas por usuario, estado o fecha y detecta cruces de horario por vehículo. */
 public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
 
+    // Bloquea una reserva durante operaciones concurrentes, como iniciar un pago.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reserva r where r.idReserva = :idReserva")
     Optional<Reserva> findByIdForUpdate(@Param("idReserva") UUID idReserva);
@@ -30,6 +32,8 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
 
     List<Reserva> findByUsuario_UserIdAndFechaReservaBetween(UUID usuarioId, LocalDate fechaInicio, LocalDate fechaFin);
 
+    // Detecta cruces de horario del mismo vehículo en la fecha solicitada.
+    // No cuenta reservas canceladas; usa la duración pactada al reservar.
     @Query(value = """
             SELECT r.*
             FROM reservas r

@@ -55,11 +55,16 @@ public class WompiSignatureService {
         // Se concatenan, en el orden indicado por signature.properties, los
         // valores de data; luego timestamp y secreto de eventos.
         for (JsonNode property : propertyNames) {
-            JsonNode value = leerRuta(evento.path("data"), property.asString());
-            if (value.isMissingNode()) return false;
-            contenido.append(value.isValueNode() ? value.asString() : value.toString());
+            String path = property.asString();
+            if (path == null || path.isBlank()) return false;
+            JsonNode value = leerRuta(evento.path("data"), path);
+            String valorFirmado = valorEscalar(value);
+            if (valorFirmado == null) return false;
+            contenido.append(valorFirmado);
         }
-        contenido.append(evento.path("timestamp").asString());
+        String timestamp = valorEscalar(evento.path("timestamp"));
+        if (timestamp == null) return false;
+        contenido.append(timestamp);
         contenido.append(requiredSecret(properties.getEventsSecret(), "eventos"));
 
         String recibidoNormalizado = recibido.toLowerCase(Locale.ROOT);
@@ -75,6 +80,13 @@ public class WompiSignatureService {
         JsonNode current = root;
         for (String segment : path.split("\\.")) current = current.path(segment);
         return current;
+    }
+
+    private String valorEscalar(JsonNode value) {
+        if (value == null || !value.isValueNode() || value.isNull()) return null;
+        if (value.isString()) return value.asString();
+        if (value.isNumber() || value.isBoolean()) return value.toString();
+        return null;
     }
 
     private String requiredSecret(String value, String nombre) {

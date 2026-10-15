@@ -82,6 +82,7 @@ class NotificacionServiceTest {
         service.crear(owner, "evento:2", "booking", "Reserva", "Creada", UUID.randomUUID(), null);
         verify(notifications).save(any());
         verify(deliveries).save(argThat(e -> "email".equals(e.canal) && e.notificacionId != null));
+        verify(deliveries, never()).save(argThat(e -> "push".equals(e.canal)));
     }
 
     @Test void registraTokenNuevoSinCrearDuplicados() {

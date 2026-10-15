@@ -38,6 +38,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -143,6 +146,27 @@ class PagoServiceTest {
         assertNotNull(pago.getFechaPago());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"id", "reference", "currency", "payment_method_type", "status"})
+    void rechazaCamposDeTransaccionQueNoSonTextuales(String field) {
+        ObjectNode webhook = evento("APPROVED", "CARD", 3_500_000, "COP", "test");
+        ((ObjectNode) webhook.path("data").path("transaction")).put(field, 123);
+
+        assertThrows(WompiEventoInvalidoException.class, () -> service.procesarEvento(webhook));
+        assertEquals(EstadoPago.pendiente, pago.getEstado());
+        assertEquals(EstadoIntentoPago.pendiente, intento.getEstado());
+    }
+
+    @Test
+    void rechazaAmbienteDeEventoQueNoEsTextual() {
+        ObjectNode webhook = evento("APPROVED", "CARD", 3_500_000, "COP", "test");
+        webhook.put("environment", true);
+
+        assertThrows(WompiEventoInvalidoException.class, () -> service.procesarEvento(webhook));
+        assertEquals(EstadoPago.pendiente, pago.getEstado());
+        assertEquals(EstadoIntentoPago.pendiente, intento.getEstado());
+    }
+
     @Test
     void rechazaMontoIncorrecto() {
         assertThrows(WompiEventoInvalidoException.class,
@@ -164,6 +188,36 @@ class PagoServiceTest {
 
         assertEquals(PagoService.ResultadoEvento.IGNORADO, resultado);
         verify(intentoRepository, never()).findByReferenciaForUpdate(any());
+    }
+
+    @Test
+    void ignoraEventoDeTransaccionDesconocidaSinCrearPago() {
+        when(intentoRepository.findByReferenciaForUpdate(REFERENCIA)).thenReturn(Optional.empty());
+
+        PagoService.ResultadoEvento resultado = service.procesarEvento(
+                evento("APPROVED", "CARD", 3_500_000, "COP", "test"));
+
+        assertEquals(PagoService.ResultadoEvento.IGNORADO, resultado);
+        assertEquals(EstadoPago.pendiente, pago.getEstado());
+        verify(pagoRepository, never()).save(any());
+        verify(notificationService, never()).crear(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void operacionesDeWebhookYConciliacionUsanTransaccionYBloqueosPesimistas() throws Exception {
+        assertTrue(PagoService.class.getMethod("procesarEvento", JsonNode.class)
+                .isAnnotationPresent(Transactional.class));
+
+        Lock intentoLock = PagoIntentoRepository.class
+                .getMethod("findByReferenciaForUpdate", String.class)
+                .getAnnotation(Lock.class);
+        Lock pagoLock = PagoRepository.class
+                .getMethod("findByIdForUpdate", UUID.class)
+                .getAnnotation(Lock.class);
+        assertNotNull(intentoLock);
+        assertNotNull(pagoLock);
+        assertEquals(LockModeType.PESSIMISTIC_WRITE, intentoLock.value());
+        assertEquals(LockModeType.PESSIMISTIC_WRITE, pagoLock.value());
     }
 
     @Test

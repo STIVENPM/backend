@@ -10,6 +10,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -26,14 +27,22 @@ public class EntregaNotificaciones {
     private final DispositivoPushRepository dispositivos;
     private final UserRepository usuarios;
     private final JavaMailSender mail;
-    private final RestClient push = crearClientePush();
+    private final RestClient push;
     @Value("${app.notificaciones.email.enabled:false}") private boolean emailEnabled;
     @Value("${app.notificaciones.push.enabled:false}") private boolean pushEnabled;
 
+    @Autowired
     public EntregaNotificaciones(NotificacionEntregaRepository entregas, NotificacionRepository notificaciones,
             DispositivoPushRepository dispositivos, UserRepository usuarios, JavaMailSender mail) {
+        this(entregas, notificaciones, dispositivos, usuarios, mail, crearClientePush());
+    }
+
+    EntregaNotificaciones(NotificacionEntregaRepository entregas, NotificacionRepository notificaciones,
+            DispositivoPushRepository dispositivos, UserRepository usuarios, JavaMailSender mail,
+            RestClient push) {
         this.entregas = entregas; this.notificaciones = notificaciones;
         this.dispositivos = dispositivos; this.usuarios = usuarios; this.mail = mail;
+        this.push = push;
     }
 
     @PostConstruct

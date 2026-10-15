@@ -196,7 +196,7 @@ class ReservaServiceTest {
     }
 
     @Test
-    void cancelarReservaAsignadaCancelaAsignacionYNotificaUnaVez() {
+    void cancelarReservaAsignadaCancelaAsignacionYNotificaAlPropietario() {
         UUID reservaId = UUID.randomUUID();
         Reserva reserva = reserva(reservaId, EstadoReserva.ASIGNADA);
         Asignacion asignacion = Asignacion.builder().reserva(reserva).estado(EstadoAsignacion.asignada).build();
@@ -208,7 +208,8 @@ class ReservaServiceTest {
         assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
         assertEquals(EstadoAsignacion.cancelada, asignacion.getEstado());
         verify(assignmentRepository).save(asignacion);
-        verify(notificationService, org.mockito.Mockito.times(2)).crear(any(), any(), any(), any(), any(), any(), any());
+        verify(notificationService).crear(user, "reserva:" + reservaId + ":CANCELADA",
+                "booking", "Reserva cancelada", "Reserva cancelada.", reservaId, null);
     }
 
     private Reserva reserva(UUID id, EstadoReserva estado) {

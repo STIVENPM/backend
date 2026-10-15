@@ -29,12 +29,16 @@ class JwtAuthenticationFilterTest {
         MockHttpServletRequest request = request();
         MockHttpServletResponse response = new MockHttpServletResponse();
         User user = new User();
-        user.setUserId(UUID.randomUUID());
+        UUID userId = UUID.randomUUID();
+        user.setUserId(userId);
+        user.setEmail("user@example.test");
         when(jwt.isTokenValid("signed-token")).thenReturn(true);
         when(jwt.extractEmail("signed-token")).thenReturn("user@example.test");
-        when(access.activeUser("user@example.test")).thenReturn(user);
+        when(jwt.extractUserId("signed-token")).thenReturn(userId);
+        when(access.activeUser(userId)).thenReturn(user);
         when(access.currentRole(user)).thenReturn("USER");
         FilterChain chain = (req, res) -> {
+            assertEquals(user.getEmail(), SecurityContextHolder.getContext().getAuthentication().getName());
             var authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
             assertEquals(1, authorities.size());
             assertEquals("ROLE_USER", authorities.iterator().next().getAuthority());
@@ -49,9 +53,11 @@ class JwtAuthenticationFilterTest {
     void inactiveAccountCannotUsePreviouslyIssuedToken() throws Exception {
         MockHttpServletRequest request = request();
         MockHttpServletResponse response = new MockHttpServletResponse();
+        UUID userId = UUID.randomUUID();
         when(jwt.isTokenValid("signed-token")).thenReturn(true);
         when(jwt.extractEmail("signed-token")).thenReturn("user@example.test");
-        when(access.activeUser("user@example.test"))
+        when(jwt.extractUserId("signed-token")).thenReturn(userId);
+        when(access.activeUser(userId))
                 .thenThrow(new BadCredentialsException("disabled"));
         FilterChain chain = mock(FilterChain.class);
 
@@ -60,6 +66,40 @@ class JwtAuthenticationFilterTest {
         assertEquals(401, response.getStatus());
         assertFalse(response.getContentAsString().contains("disabled"));
         verifyNoInteractions(chain);
+    }
+
+    @Test
+    void oldEmailClaimCannotAuthenticateAfterAccountEmailChanges() throws Exception {
+        MockHttpServletRequest request = request();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        UUID userId = UUID.randomUUID();
+        User user = new User();
+        user.setUserId(userId);
+        user.setEmail("new@example.test");
+        when(jwt.isTokenValid("signed-token")).thenReturn(true);
+        when(jwt.extractUserId("signed-token")).thenReturn(userId);
+        when(jwt.extractEmail("signed-token")).thenReturn("old@example.test");
+        when(access.activeUser(userId)).thenReturn(user);
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(401, response.getStatus());
+        verifyNoInteractions(chain);
+    }
+
+    @Test
+    void legacyEmailSubjectTokenIsRejected() throws Exception {
+        MockHttpServletRequest request = request();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(jwt.isTokenValid("signed-token")).thenReturn(true);
+        when(jwt.extractUserId("signed-token")).thenThrow(new IllegalArgumentException("invalid UUID"));
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(401, response.getStatus());
+        verifyNoInteractions(access, chain);
     }
 
     private MockHttpServletRequest request() {

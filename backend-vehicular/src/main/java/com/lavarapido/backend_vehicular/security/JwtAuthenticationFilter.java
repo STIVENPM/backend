@@ -1,6 +1,7 @@
 
 package com.lavarapido.backend_vehicular.security;
 
+import com.lavarapido.backend_vehicular.users.entity.User;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,7 +9,9 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -16,8 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
-import org.springframework.security.core.AuthenticationException;
-import com.lavarapido.backend_vehicular.users.entity.User;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -61,16 +63,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Extraer información del JWT
-        String email = jwtService.extractEmail(token);
-        // El JWT firmado identifica la cuenta; el rol se vuelve a consultar en BD.
+        // El UUID identifica la cuenta; el email firmado invalida sesiones tras cambiarlo.
         final User user;
         final String role;
         try {
+            UUID userId = jwtService.extractUserId(token);
+            String email = jwtService.extractEmail(token);
+            user = accountAccessService.activeUser(userId);
+            if (email == null || !email.equals(user.getEmail())) {
+                throw new BadCredentialsException("Invalid session");
+            }
             // El rol se consulta en BD en cada peticion; no se toma del JWT.
-            user = accountAccessService.activeUser(email);
             role = accountAccessService.currentRole(user);
-        } catch (AuthenticationException exception) {
+        } catch (AuthenticationException | IllegalArgumentException exception) {
             // Cuenta desactivada o rol invalido: se borra el contexto y se responde 401.
             SecurityContextHolder.clearContext();
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -87,11 +92,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         )
                 );
 
-        // Crear la autenticación del usuario
+        // El principal sigue siendo el correo para no cambiar los contratos internos.
         UsernamePasswordAuthenticationToken auth =
-                // El principal es el correo; la contrasena ya no viaja en esta peticion.
                 new UsernamePasswordAuthenticationToken(
-                        email,
+                        user.getEmail(),
                         null,
                         authorities
                 );

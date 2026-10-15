@@ -6,6 +6,7 @@ import com.lavarapido.backend_vehicular.security.JwtService;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangeEmailRequestDTO;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.enums.DocumentType;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
@@ -59,7 +60,7 @@ class UserServiceSecurityTest {
         User user = new User();
         user.setEmail("inactive@example.test");
         user.setStatus(false);
-        when(users.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(users.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
 
         assertThrows(BadCredentialsException.class,
                 () -> service.login(new LoginDTO(user.getEmail(), "ValidPass123")));
@@ -72,7 +73,7 @@ class UserServiceSecurityTest {
         user.setEmail("active@example.test");
         user.setStatus(true);
         user.setPassword("stored-hash");
-        when(users.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(users.findByEmailIgnoreCase(user.getEmail())).thenReturn(Optional.of(user));
         when(passwords.matches("incorrect", "stored-hash")).thenReturn(false);
 
         assertThrows(BadCredentialsException.class,
@@ -180,8 +181,100 @@ class UserServiceSecurityTest {
         verify(users, never()).save(otherUser);
     }
 
+    @Test
+    void changesOwnEmailAfterPasswordCheckAndNormalizesIt() {
+        User user = activeUser("authenticated@example.test", "old-hash");
+        authenticate(user.getEmail());
+        when(access.activeUser(user.getEmail())).thenReturn(user);
+        when(passwords.matches("CurrentPass1", "old-hash")).thenReturn(true);
+        when(users.existsByEmailIgnoreCaseAndUserIdNot("new@example.test", user.getUserId())).thenReturn(false);
+        when(users.save(user)).thenReturn(user);
+
+        var response = service.changeEmail(new ChangeEmailRequestDTO(
+                "CurrentPass1", "  New@Example.Test  "));
+
+        assertEquals(2, ChangeEmailRequestDTO.class.getRecordComponents().length);
+        assertEquals("new@example.test", user.getEmail());
+        assertEquals(user.getEmail(), response.email());
+        verify(access).activeUser("authenticated@example.test");
+        verify(passwords).matches("CurrentPass1", "old-hash");
+        verify(users).save(user);
+        verifyNoInteractions(jwt);
+    }
+
+    @Test
+    void incorrectPasswordPreventsEmailChange() {
+        User user = activeUser("authenticated@example.test", "old-hash");
+        authenticate(user.getEmail());
+        when(access.activeUser(user.getEmail())).thenReturn(user);
+        when(passwords.matches("WrongPass1", "old-hash")).thenReturn(false);
+
+        assertThrows(com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException.class,
+                () -> service.changeEmail(new ChangeEmailRequestDTO("WrongPass1", "new@example.test")));
+
+        assertEquals("authenticated@example.test", user.getEmail());
+        verify(users, never()).save(any());
+        verify(users, never()).existsByEmailIgnoreCaseAndUserIdNot(anyString(), any());
+    }
+
+    @Test
+    void duplicateEmailIsRejectedWithoutChangingAccount() {
+        User user = activeUser("authenticated@example.test", "old-hash");
+        authenticate(user.getEmail());
+        when(access.activeUser(user.getEmail())).thenReturn(user);
+        when(passwords.matches("CurrentPass1", "old-hash")).thenReturn(true);
+        when(users.existsByEmailIgnoreCaseAndUserIdNot("taken@example.test", user.getUserId())).thenReturn(true);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.changeEmail(new ChangeEmailRequestDTO("CurrentPass1", "Taken@Example.Test")));
+
+        assertEquals("authenticated@example.test", user.getEmail());
+        verify(users, never()).save(any());
+    }
+
+    @Test
+    void unauthenticatedUserCannotChangeEmail() {
+        SecurityContextHolder.clearContext();
+
+        assertThrows(BadCredentialsException.class,
+                () -> service.changeEmail(new ChangeEmailRequestDTO("CurrentPass1", "new@example.test")));
+
+        verifyNoInteractions(access, passwords, users);
+    }
+
+    @Test
+    void newEmailCanLoginButThePreviousEmailCannot() {
+        User user = activeUser("new@example.test", "stored-hash");
+        when(users.findByEmailIgnoreCase("new@example.test")).thenReturn(Optional.of(user));
+        when(users.findByEmailIgnoreCase("old@example.test")).thenReturn(Optional.empty());
+        when(passwords.matches("CurrentPass1", "stored-hash")).thenReturn(true);
+        when(access.currentRole(user)).thenReturn("USER");
+        when(jwt.generateToken(user.getUserId(), user.getEmail())).thenReturn("new-token");
+
+        var response = service.login(new LoginDTO(" New@Example.Test ", "CurrentPass1"));
+
+        assertEquals("new-token", response.getToken());
+        verify(jwt).generateToken(user.getUserId(), "new@example.test");
+        assertThrows(BadCredentialsException.class,
+                () -> service.login(new LoginDTO("old@example.test", "CurrentPass1")));
+    }
+
+    @Test
+    void registrationNormalizesEmailBeforeCheckingAndSaving() {
+        when(passwords.encode(any())).thenReturn("bcrypt-hash-placeholder");
+        when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        UserRegistrationDTO input = new UserRegistrationDTO("  New@Example.Test  ", "Ana", "Test",
+                "3001234567", DocumentType.CC, "123456", "ValidPass123");
+
+        UserRegistrationResponseDTO response = service.registerUser(input);
+
+        assertEquals("new@example.test", response.email());
+        verify(users).existsByEmailIgnoreCase("new@example.test");
+    }
+
     private static User activeUser(String email, String passwordHash) {
         User user = new User();
+        user.setUserId(UUID.randomUUID());
         user.setEmail(email);
         user.setPassword(passwordHash);
         user.setStatus(true);

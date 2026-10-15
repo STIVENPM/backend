@@ -12,6 +12,7 @@ import javax.crypto.SecretKey;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,12 +34,12 @@ public class JwtService {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
-    // El JWT identifica por email y caduca una hora después; no fija el rol.
-    public String generateToken(String email) {
+    // El JWT identifica por UUID inmutable; el rol siempre se consulta en la BD.
+    public String generateToken(UUID userId, String email) {
 
         return Jwts.builder()
-                // El subject permite al filtro buscar la cuenta por correo.
-                .subject(email)
+                .subject(userId.toString())
+                .claim("email", email)
                 .issuedAt(new Date())
                 .expiration(
                         new Date(
@@ -50,9 +51,14 @@ public class JwtService {
                 .compact();
     }
 
-    // Recupera el email firmado que identifica la cuenta.
+    // Recupera el UUID firmado que identifica la cuenta de forma inmutable.
+    public UUID extractUserId(String token) {
+        return UUID.fromString(getClaims(token).getSubject());
+    }
+
+    // Recupera el correo firmado para invalidar sesiones tras un cambio de correo.
     public String extractEmail(String token) {
-        return getClaims(token).getSubject();
+        return getClaims(token).get("email", String.class);
     }
 
     // Verifica firma y caducidad; un JWT inválido no autentica.

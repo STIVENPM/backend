@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -102,19 +103,39 @@ public class NotificacionService {
             throw new IllegalArgumentException("Dispositivo inválido");
         }
         User usuario = actual();
-        dispositivos.findByToken(token).ifPresent(anterior -> {
-            if (!anterior.usuarioId.equals(usuario.getUserId())
-                    || !anterior.instalacionId.equals(instalacion)) {
-                anterior.activo = false;
-                anterior.token = "revoked-" + anterior.id;
-                dispositivos.saveAndFlush(anterior);
+        String bloqueoToken = "push-token:" + token;
+        String bloqueoInstalacion = "push-installation:" + usuario.getUserId() + ":" + instalacion;
+        java.util.stream.Stream.of(bloqueoToken, bloqueoInstalacion).sorted()
+                .forEach(dispositivos::bloquearRegistro);
+
+        DispositivoPush porToken = dispositivos.findByToken(token).orElse(null);
+        DispositivoPush porInstalacion = dispositivos
+                .findByUsuarioIdAndInstalacionId(usuario.getUserId(), instalacion).orElse(null);
+
+        if (porToken != null && !porToken.usuarioId.equals(usuario.getUserId())) {
+            // Un cambio de cuenta solo puede recuperar el mismo dispositivo después
+            // de que la cuenta anterior lo haya desactivado explícitamente.
+            if (porToken.activo || !porToken.instalacionId.equals(instalacion)) {
+                throw new AccessDeniedException("El token pertenece a otro usuario");
             }
-        });
-        DispositivoPush d = dispositivos.findByUsuarioIdAndInstalacionId(usuario.getUserId(), instalacion)
-                .orElseGet(DispositivoPush::new);
-        d.usuarioId = usuario.getUserId(); d.instalacionId = instalacion;
-        d.token = token; d.activo = true;
-        dispositivos.save(d);
+        }
+
+        DispositivoPush destino = porToken != null ? porToken : porInstalacion;
+        if (porToken != null && porInstalacion != null && porToken != porInstalacion
+                && !porToken.id.equals(porInstalacion.id)) {
+            // Conserva la fila histórica referenciada por entregas, pero libera la
+            // combinación usuario/instalación antes de reutilizar la fila del token.
+            porInstalacion.activo = false;
+            porInstalacion.token = "revoked-" + porInstalacion.id;
+            porInstalacion.instalacionId = "revoked-" + porInstalacion.id;
+            dispositivos.saveAndFlush(porInstalacion);
+        }
+        if (destino == null) destino = new DispositivoPush();
+        destino.usuarioId = usuario.getUserId();
+        destino.instalacionId = instalacion;
+        destino.token = token;
+        destino.activo = true;
+        dispositivos.save(destino);
     }
 
     @Transactional

@@ -8,6 +8,7 @@ import com.lavarapido.backend_vehicular.pagos.exception.WompiEventoInvalidoExcep
 import com.lavarapido.backend_vehicular.pagos.exception.WompiProveedorException;
 import com.lavarapido.backend_vehicular.reservas.exception.HorarioReservaInvalidoException;
 import com.lavarapido.backend_vehicular.reservas.exception.EstadoReservaInvalidoException;
+import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.reservas.exception.VehiculoNoPerteneceUsuarioException;
 import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 import org.springframework.dao.DataAccessException;
@@ -104,6 +105,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handlePagoConflict(PagoConflictException exception) {
         // Ejemplo: la reserva ya tiene pago aprobado o el intento cambio de estado.
         return response(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(ReservaCancelacionConflictException.class)
+    public ResponseEntity<Map<String, String>> handleReservationCancellationConflict(
+            ReservaCancelacionConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", exception.getCode(), "error", exception.getMessage()));
     }
 
     @ExceptionHandler(WompiEventoInvalidoException.class)

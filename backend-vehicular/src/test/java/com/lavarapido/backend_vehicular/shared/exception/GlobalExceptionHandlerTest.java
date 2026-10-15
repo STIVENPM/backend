@@ -1,6 +1,7 @@
 package com.lavarapido.backend_vehicular.shared.exception;
 
 import org.junit.jupiter.api.Test;
+import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,5 +24,15 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(400, response.getStatusCode().value());
         assertEquals("CURRENT_PASSWORD_INVALID", response.getBody().get("error"));
+    }
+
+    @Test
+    void reservationCancellationConflictReturnsStableMachineReadableCode() {
+        var response = new GlobalExceptionHandler().handleReservationCancellationConflict(
+                new ReservaCancelacionConflictException("PAGO_PENDIENTE", "No se puede confirmar"));
+
+        assertEquals(409, response.getStatusCode().value());
+        assertEquals("PAGO_PENDIENTE", response.getBody().get("code"));
+        assertEquals("No se puede confirmar", response.getBody().get("error"));
     }
 }

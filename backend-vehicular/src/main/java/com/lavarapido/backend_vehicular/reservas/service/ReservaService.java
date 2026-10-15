@@ -8,8 +8,15 @@ import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.exception.EstadoReservaInvalidoException;
 import com.lavarapido.backend_vehicular.reservas.exception.HorarioReservaInvalidoException;
+import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.reservas.exception.VehiculoNoPerteneceUsuarioException;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
+import com.lavarapido.backend_vehicular.pagos.entity.Pago;
+import com.lavarapido.backend_vehicular.pagos.entity.PagoIntento;
+import com.lavarapido.backend_vehicular.pagos.enums.EstadoIntentoPago;
+import com.lavarapido.backend_vehicular.pagos.enums.EstadoPago;
+import com.lavarapido.backend_vehicular.pagos.repository.PagoIntentoRepository;
+import com.lavarapido.backend_vehicular.pagos.repository.PagoRepository;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
 import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
@@ -29,8 +36,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -43,7 +52,11 @@ public class ReservaService {
     private final ServicioRepository servicioRepository;
     private final AsignacionRepository asignacionRepository;
     private final NotificacionService notificacionService;
-    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository, NotificacionService notificacionService) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; this.notificacionService=notificacionService; }
+    private final PagoRepository pagoRepository;
+    private final PagoIntentoRepository pagoIntentoRepository;
+    private static final Set<String> TERMINAL_WOMPI_FAILURES = Set.of("DECLINED", "VOIDED", "ERROR");
+
+    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository, NotificacionService notificacionService, PagoRepository pagoRepository, PagoIntentoRepository pagoIntentoRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; this.notificacionService=notificacionService; this.pagoRepository=pagoRepository; this.pagoIntentoRepository=pagoIntentoRepository; }
 
     // Comprueba dueño, disponibilidad y horario; guarda precio y duración pactados.
     @Transactional
@@ -142,10 +155,17 @@ public class ReservaService {
     public ReservaResponseDTO cambiarEstado(UUID idReserva, EstadoReserva nuevoEstado) {
         Reserva reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
+        return cambiarEstadoBloqueado(reserva, nuevoEstado);
+    }
 
+    private ReservaResponseDTO cambiarEstadoBloqueado(Reserva reserva, EstadoReserva nuevoEstado) {
+        UUID idReserva = reserva.getIdReserva();
         EstadoReserva anterior = reserva.getEstado();
         validarTransicion(reserva.getEstado(), nuevoEstado);
         if (anterior == nuevoEstado) return mapearAResponse(reserva);
+        if (nuevoEstado == EstadoReserva.CANCELADA) {
+            validarPagoCancelable(idReserva);
+        }
         reserva.setEstado(nuevoEstado);
 
         if (nuevoEstado == EstadoReserva.CANCELADA) {
@@ -182,11 +202,48 @@ public class ReservaService {
     // Reutiliza la transición de estado hacia CANCELADA.
     @Transactional
     public ReservaResponseDTO cancelar(UUID idReserva) {
-        Reserva reserva = reservaRepository.findById(idReserva)
+        return cancelarConResultado(idReserva).reserva();
+    }
+
+    @Transactional
+    public ResultadoCancelacion cancelarConResultado(UUID idReserva) {
+        Reserva reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         validarPropietarioOAdmin(reserva, obtenerUsuarioAutenticado());
-        return cambiarEstado(idReserva, EstadoReserva.CANCELADA);
+        if (reserva.getEstado() == EstadoReserva.CANCELADA) {
+            return new ResultadoCancelacion(mapearAResponse(reserva), true);
+        }
+        return new ResultadoCancelacion(cambiarEstadoBloqueado(reserva, EstadoReserva.CANCELADA), false);
     }
+
+    private void validarPagoCancelable(UUID idReserva) {
+        Pago pago = pagoRepository.findByReservaIdForUpdate(idReserva).orElse(null);
+        if (pago == null) return;
+
+        List<PagoIntento> intentos = pagoIntentoRepository
+                .findByPago_IdPagoOrderByCreatedAtAsc(pago.getIdPago());
+        boolean tieneAprobacion = pago.getEstado() == EstadoPago.aprobado
+                || intentos.stream().anyMatch(intento ->
+                intento.getEstado() == EstadoIntentoPago.aprobado
+                        || intento.getEstado() == EstadoIntentoPago.aprobado_duplicado);
+        if (tieneAprobacion) {
+            throw new ReservaCancelacionConflictException(
+                    "PAGO_APROBADO",
+                    "La reserva tiene un pago aprobado y no puede cancelarse");
+        }
+
+        boolean estadosRemotosFinales = !intentos.isEmpty() && intentos.stream().allMatch(intento ->
+                intento.getEstado() == EstadoIntentoPago.rechazado
+                        && intento.getWompiStatus() != null
+                        && TERMINAL_WOMPI_FAILURES.contains(intento.getWompiStatus().toUpperCase(Locale.ROOT)));
+        if (pago.getEstado() != EstadoPago.rechazado || !estadosRemotosFinales) {
+            throw new ReservaCancelacionConflictException(
+                    "PAGO_PENDIENTE",
+                    "El pago aún no tiene un estado final confirmado por Wompi");
+        }
+    }
+
+    public record ResultadoCancelacion(ReservaResponseDTO reserva, boolean yaEstabaCancelada) { }
 
     private void validarHoraReserva(LocalTime horaReserva) {
         if (horaReserva == null) {

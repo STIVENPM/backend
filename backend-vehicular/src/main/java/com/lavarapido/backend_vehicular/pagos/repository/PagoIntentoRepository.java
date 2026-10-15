@@ -14,6 +14,8 @@ import java.util.UUID;
 
 /** Consulta los intentos de pago por referencia, transacción de Wompi, estado o historial. */
 public interface PagoIntentoRepository extends JpaRepository<PagoIntento, UUID> {
+    Optional<PagoIntento> findByReferencia(String referencia);
+
     // La referencia identifica el intento dentro de un pago concreto.
     Optional<PagoIntento> findByReferenciaAndPago_IdPago(String referencia, UUID idPago);
 

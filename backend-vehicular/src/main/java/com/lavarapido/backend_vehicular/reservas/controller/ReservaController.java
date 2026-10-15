@@ -61,6 +61,10 @@ public class ReservaController {
     // Pide cancelar la reserva sin borrarla.
     @PatchMapping("/{id}/cancelar")
     public ResponseEntity<ReservaResponseDTO> cancelar(@PathVariable UUID id) {
-        return ResponseEntity.ok(reservaService.cancelar(id));
+        ReservaService.ResultadoCancelacion resultado = reservaService.cancelarConResultado(id);
+        return ResponseEntity.ok()
+                .header("X-Reservation-Cancellation-Result",
+                        resultado.yaEstabaCancelada() ? "ALREADY_CANCELLED" : "CANCELLED")
+                .body(resultado.reserva());
     }
 }

@@ -386,7 +386,7 @@ public class PagoService {
         if ((value.isMissingNode() || value.isNull()) && camelCase != null) {
             value = transaction.path(camelCase);
         }
-        if (!value.isTextual() || value.asString().isBlank()) {
+        if (!value.isString() || value.asString().isBlank()) {
             throw new WompiEventoInvalidoException("La transaccion Wompi no contiene " + snakeCase);
         }
         return value.asString();
@@ -394,7 +394,7 @@ public class PagoService {
 
     private String textoRequerido(JsonNode node, String field, String label) {
         JsonNode value = node.path(field);
-        if (!value.isTextual() || value.asString().isBlank()) {
+        if (!value.isString() || value.asString().isBlank()) {
             throw new WompiEventoInvalidoException("El evento Wompi no contiene " + label);
         }
         return value.asString();

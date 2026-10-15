@@ -154,9 +154,6 @@ public class ReservaService {
                     asignacion.setEstado(com.lavarapido.backend_vehicular.asignaciones.enums.EstadoAsignacion.cancelada);
                     asignacionRepository.save(asignacion);
                 }
-                notificacionService.crear(asignacion.getOperador().getUsuario(),
-                        "reserva:" + idReserva + ":cancelada:operador", "booking",
-                        "Reserva cancelada", "La reserva asignada fue cancelada.", idReserva, null);
             });
         }
 

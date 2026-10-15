@@ -49,10 +49,43 @@ class WompiSignatureServiceTest {
     }
 
     @Test
+    void firmaWebhookValida_aceptaPayloadOficialConPropiedadesAnidadasYTimestampNumerico() {
+        ObjectNode evento = objectMapper.createObjectNode();
+        evento.put("timestamp", 1700);
+        evento.put("environment", "test");
+        evento.put("event", "transaction.updated");
+        ObjectNode signature = evento.putObject("signature");
+        signature.putArray("properties")
+                .add("transaction.id")
+                .add("transaction.status")
+                .add("transaction.amount_in_cents");
+        ObjectNode transaction = evento.putObject("data").putObject("transaction");
+        transaction.put("id", "abc123");
+        transaction.put("status", "APPROVED");
+        transaction.put("amount_in_cents", 3500000);
+        signature.put("checksum", sha256(
+                "abc123APPROVED35000001700" + properties.getEventsSecret()));
+
+        assertTrue(service.firmaWebhookValida(evento, null));
+    }
+
+    @Test
     void firmaWebhookValida_rechazaChecksumInvalido() throws Exception {
         JsonNode evento = construirEvento("abc123", "approved", "1700");
 
         assertFalse(service.firmaWebhookValida(evento, "checksum-invalido"));
+    }
+
+    @Test
+    void firmaWebhookValida_rechazaPropiedadFirmadaAusente() {
+        ObjectNode evento = objectMapper.createObjectNode();
+        evento.put("timestamp", 1700);
+        ObjectNode signature = evento.putObject("signature");
+        signature.putArray("properties").add("transaction.id");
+        signature.put("checksum", "00");
+        evento.putObject("data").putObject("transaction");
+
+        assertFalse(service.firmaWebhookValida(evento, null));
     }
 
     @Test

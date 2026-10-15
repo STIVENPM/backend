@@ -5,6 +5,7 @@ import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
 import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangeEmailRequestDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserSessionDTO;
@@ -60,5 +61,11 @@ public class UserController {
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequestDTO dto) {
         userService.changePassword(dto);
         return ResponseEntity.noContent().build();
+    }
+
+    // Cambia el correo de la cuenta autenticada tras comprobar la contraseña actual.
+    @PutMapping("/email")
+    public ResponseEntity<UserProfileResponseDTO> changeEmail(@Valid @RequestBody ChangeEmailRequestDTO dto) {
+        return ResponseEntity.ok(userService.changeEmail(dto));
     }
 }

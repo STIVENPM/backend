@@ -6,6 +6,7 @@ import com.lavarapido.backend_vehicular.users.entity.UserRole;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
@@ -32,6 +33,17 @@ public class AccountAccessService {
         // El correo del JWT o del login se contrasta con la cuenta actual en BD.
         User user = users.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid session"));
+        return requireActive(user);
+    }
+
+    // Los JWT identifican la cuenta por su UUID inmutable, nunca por un correo reasignable.
+    public User activeUser(UUID userId) {
+        User user = users.findById(userId)
+                .orElseThrow(() -> new BadCredentialsException("Invalid session"));
+        return requireActive(user);
+    }
+
+    private User requireActive(User user) {
         if (!Boolean.TRUE.equals(user.getStatus())) {
             throw new BadCredentialsException("Invalid session");
         }

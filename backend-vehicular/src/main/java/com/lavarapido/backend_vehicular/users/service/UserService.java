@@ -7,6 +7,7 @@ import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.security.JwtService;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
 import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangeEmailRequestDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
@@ -21,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
 
 @Service
 public class UserService {
@@ -43,7 +45,8 @@ public class UserService {
 
         // Comprueba el correo antes del guardado; la columna UNIQUE de BD también
         // impide duplicados si dos registros llegan al mismo tiempo.
-        if (userRepository.existsByEmail(dto.getEmail())) {
+        String email = normalizeEmail(dto.getEmail());
+        if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new IllegalStateException("El correo ya esta registrado");
         }
 
@@ -51,7 +54,7 @@ public class UserService {
         User user = new User();
 
         // Mapea los datos permitidos del DTO; el cliente no asigna estado ni rol.
-        user.setEmail(dto.getEmail());
+        user.setEmail(email);
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
         user.setPhoneNumber(dto.getPhoneNumber());
@@ -69,41 +72,20 @@ public class UserService {
     }
 
     // Compara la contraseña enviada con el hash guardado y emite el JWT.
-public LoginResponseDTO login(LoginDTO dto) {
+    public LoginResponseDTO login(LoginDTO dto) {
+        User user = userRepository.findByEmailIgnoreCase(normalizeEmail(dto.getEmail()))
+                .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
+        if (!Boolean.TRUE.equals(user.getStatus())
+                || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Credenciales incorrectas");
+        }
 
-    // Cuenta ausente o desactivada devuelve el mismo error para no revelar su estado.
-    User user = userRepository.findByEmail(dto.getEmail())
-            .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
-    if (!Boolean.TRUE.equals(user.getStatus())) {
-        throw new BadCredentialsException("Credenciales incorrectas");
+        String roleName = accountAccessService.currentRole(user);
+        String token = jwtService.generateToken(user.getUserId(), user.getEmail());
+        LoginResponseDTO.UserInfoDTO info = new LoginResponseDTO.UserInfoDTO(
+                user.getUserId().toString(), user.getFirstName(), user.getEmail(), roleName);
+        return new LoginResponseDTO(token, info);
     }
-
-    // BCrypt compara el texto recibido con el hash de users.password.
-    boolean valid = passwordEncoder.matches(
-        dto.getPassword(),
-        user.getPassword()
-    );
-
-    if (!valid) {
-        throw new BadCredentialsException("Credenciales incorrectas");
-    }
-
-    // El rol se lee de las asignaciones activas, no de lo enviado por el cliente.
-    String roleName = accountAccessService.currentRole(user);
-
-    // Solo después de validar contraseña y rol se firma el JWT de una hora.
-    String token = jwtService.generateToken(user.getEmail());
-
-    LoginResponseDTO.UserInfoDTO info =
-            new LoginResponseDTO.UserInfoDTO(
-                    user.getUserId().toString(),
-                    user.getFirstName(),
-                    user.getEmail(),
-                    roleName
-            );
-
-    return new LoginResponseDTO(token, info);
-}
 
     // Vuelve a consultar el usuario y su rol actual para /users/me.
     public UserSessionDTO getSession() {
@@ -136,16 +118,30 @@ public LoginResponseDTO login(LoginDTO dto) {
         return UserProfileResponseDTO.from(userRepository.save(user));
     }
 
+    // Cambia únicamente el correo de la identidad autenticada tras verificar su contraseña.
+    @Transactional
+    public UserProfileResponseDTO changeEmail(ChangeEmailRequestDTO dto) {
+        Authentication authentication = authenticatedPrincipal();
+        User user = accountAccessService.activeUser(authentication.getName());
+        if (!passwordEncoder.matches(dto.currentPassword(), user.getPassword())) {
+            throw new CurrentPasswordInvalidException();
+        }
+
+        String email = normalizeEmail(dto.newEmail());
+        if (userRepository.existsByEmailIgnoreCaseAndUserIdNot(email, user.getUserId())) {
+            throw new IllegalStateException("El correo ya esta registrado");
+        }
+        if (!user.getEmail().equals(email)) {
+            user.setEmail(email);
+            userRepository.save(user);
+        }
+        return UserProfileResponseDTO.from(user);
+    }
+
     // Actualiza la contraseña de la cuenta autenticada, sin aceptar un ID del cliente.
     @Transactional
     public void changePassword(ChangePasswordRequestDTO dto) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || authentication.getName() == null || authentication.getName().isBlank()
-                || "anonymousUser".equals(authentication.getName())) {
-            throw new BadCredentialsException("Invalid session");
-        }
-
+        Authentication authentication = authenticatedPrincipal();
         User user = accountAccessService.activeUser(authentication.getName());
         if (!passwordEncoder.matches(dto.currentPassword(), user.getPassword())) {
             throw new CurrentPasswordInvalidException();
@@ -154,5 +150,22 @@ public LoginResponseDTO login(LoginDTO dto) {
         PasswordRules.requireValid(dto.newPassword());
         user.setPassword(passwordEncoder.encode(dto.newPassword()));
         userRepository.save(user);
+    }
+
+    private Authentication authenticatedPrincipal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getName() == null || authentication.getName().isBlank()
+                || "anonymousUser".equals(authentication.getName())) {
+            throw new BadCredentialsException("Invalid session");
+        }
+        return authentication;
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("El correo es obligatorio");
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

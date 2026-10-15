@@ -121,6 +121,8 @@ class PagoServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(owner.getEmail(), null));
         when(accountAccessService.activeUser(owner.getEmail())).thenReturn(owner);
+        when(reservaRepository.findByIdForUpdate(RESERVA_ID)).thenReturn(Optional.of(reserva));
+        when(intentoRepository.findByReferencia(REFERENCIA)).thenReturn(Optional.of(intento));
         when(intentoRepository.findByReferenciaForUpdate(REFERENCIA)).thenReturn(Optional.of(intento));
         when(intentoRepository.findByWompiEnvironmentAndWompiTransactionId(any(), any())).thenReturn(Optional.empty());
         when(pagoRepository.findByIdForUpdate(PAGO_ID)).thenReturn(Optional.of(pago));
@@ -240,6 +242,16 @@ class PagoServiceTest {
     }
 
     @Test
+    void webhookBloqueaEnOrdenReservaIntentoPago() {
+        service.procesarEvento(evento("APPROVED", "CARD", 3_500_000, "COP", "test"));
+
+        var lockOrder = inOrder(reservaRepository, intentoRepository, pagoRepository);
+        lockOrder.verify(reservaRepository).findByIdForUpdate(RESERVA_ID);
+        lockOrder.verify(intentoRepository).findByReferenciaForUpdate(REFERENCIA);
+        lockOrder.verify(pagoRepository).findByIdForUpdate(PAGO_ID);
+    }
+
+    @Test
     void reintentoTrasRechazoConservaIntentoAnterior() {
         service.procesarEvento(evento("DECLINED", "PSE", 3_500_000, "COP", "test"));
         when(reservaRepository.findByIdForUpdate(RESERVA_ID)).thenReturn(Optional.of(reserva));
@@ -335,7 +347,7 @@ class PagoServiceTest {
     void reconciliacionAdminAplicaRespuestaVerificada() {
         autenticarAdmin();
         intento.setWompiTransactionId("tx-1");
-        when(pagoRepository.findByReservaIdForUpdate(RESERVA_ID)).thenReturn(Optional.of(pago));
+        when(pagoRepository.findByReserva_IdReserva(RESERVA_ID)).thenReturn(Optional.of(pago));
         when(intentoRepository.findByPago_IdPagoAndEstadoOrderByCreatedAtAsc(PAGO_ID, EstadoIntentoPago.pendiente))
                 .thenReturn(List.of(intento));
         when(transactionClient.consultar("tx-1"))
@@ -353,7 +365,7 @@ class PagoServiceTest {
     void reconciliacionPropagaErrorDelProveedorSinMarcarFallo() {
         autenticarAdmin();
         intento.setWompiTransactionId("tx-1");
-        when(pagoRepository.findByReservaIdForUpdate(RESERVA_ID)).thenReturn(Optional.of(pago));
+        when(pagoRepository.findByReserva_IdReserva(RESERVA_ID)).thenReturn(Optional.of(pago));
         when(intentoRepository.findByPago_IdPagoAndEstadoOrderByCreatedAtAsc(PAGO_ID, EstadoIntentoPago.pendiente))
                 .thenReturn(List.of(intento));
         when(transactionClient.consultar("tx-1"))
@@ -362,6 +374,7 @@ class PagoServiceTest {
         assertThrows(WompiProveedorException.class, () -> service.reconciliar(RESERVA_ID));
         assertEquals(EstadoIntentoPago.pendiente, intento.getEstado());
         assertEquals(EstadoPago.pendiente, pago.getEstado());
+        verify(reservaRepository, never()).findByIdForUpdate(RESERVA_ID);
     }
 
     @Test

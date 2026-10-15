@@ -8,9 +8,16 @@ import com.lavarapido.backend_vehicular.reservas.dto.ReservaRequestDTO;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
+import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.reservas.repository.ReservaRepository;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
+import com.lavarapido.backend_vehicular.pagos.entity.Pago;
+import com.lavarapido.backend_vehicular.pagos.entity.PagoIntento;
+import com.lavarapido.backend_vehicular.pagos.enums.EstadoIntentoPago;
+import com.lavarapido.backend_vehicular.pagos.enums.EstadoPago;
+import com.lavarapido.backend_vehicular.pagos.repository.PagoIntentoRepository;
+import com.lavarapido.backend_vehicular.pagos.repository.PagoRepository;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
 import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 import com.lavarapido.backend_vehicular.shared.exception.GlobalExceptionHandler;
@@ -59,6 +66,8 @@ class ReservaServiceTest {
     private final ServicioRepository serviceRepository = mock(ServicioRepository.class);
     private final AsignacionRepository assignmentRepository = mock(AsignacionRepository.class);
     private final NotificacionService notificationService = mock(NotificacionService.class);
+    private final PagoRepository paymentRepository = mock(PagoRepository.class);
+    private final PagoIntentoRepository paymentAttemptRepository = mock(PagoIntentoRepository.class);
 
     private final ReservaService reservationService = new ReservaService(
             reservationRepository,
@@ -67,7 +76,9 @@ class ReservaServiceTest {
             vehicleRepository,
             serviceRepository,
             assignmentRepository,
-            notificationService
+            notificationService,
+            paymentRepository,
+            paymentAttemptRepository
     );
 
     private User user;
@@ -210,6 +221,150 @@ class ReservaServiceTest {
         verify(assignmentRepository).save(asignacion);
         verify(notificationService).crear(user, "reserva:" + reservaId + ":CANCELADA",
                 "booking", "Reserva cancelada", "Reserva cancelada.", reservaId, null);
+    }
+
+    @Test
+    void cancelaReservaPendienteSinPagoYBloqueaReservaAntesDeConsultarPago() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.PENDIENTE);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        when(paymentRepository.findByReservaIdForUpdate(reservaId)).thenReturn(Optional.empty());
+        when(reservationRepository.save(reserva)).thenReturn(reserva);
+
+        reservationService.cancelar(reservaId);
+
+        assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
+        verify(notificationService).crear(user, "reserva:" + reservaId + ":CANCELADA",
+                "booking", "Reserva cancelada", "Reserva cancelada.", reservaId, null);
+        var lockOrder = inOrder(reservationRepository, paymentRepository);
+        lockOrder.verify(reservationRepository).findByIdForUpdate(reservaId);
+        lockOrder.verify(paymentRepository).findByReservaIdForUpdate(reservaId);
+    }
+
+    @Test
+    void rechazaCancelacionSiElPagoEstaAprobado() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.PENDIENTE);
+        Pago pago = pago(reserva, EstadoPago.aprobado);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        when(paymentRepository.findByReservaIdForUpdate(reservaId)).thenReturn(Optional.of(pago));
+
+        ReservaCancelacionConflictException exception = assertThrows(
+                ReservaCancelacionConflictException.class,
+                () -> reservationService.cancelar(reservaId)
+        );
+
+        assertEquals("PAGO_APROBADO", exception.getCode());
+        assertEquals(EstadoReserva.PENDIENTE, reserva.getEstado());
+        verify(reservationRepository, never()).save(any(Reserva.class));
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void noConfirmaCancelacionConIntentoWompiPendiente() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.PENDIENTE);
+        Pago pago = pago(reserva, EstadoPago.pendiente);
+        PagoIntento intento = intento(pago, EstadoIntentoPago.pendiente, "PENDING");
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        when(paymentRepository.findByReservaIdForUpdate(reservaId)).thenReturn(Optional.of(pago));
+        when(paymentAttemptRepository.findByPago_IdPagoOrderByCreatedAtAsc(pago.getIdPago()))
+                .thenReturn(List.of(intento));
+
+        ReservaCancelacionConflictException exception = assertThrows(
+                ReservaCancelacionConflictException.class,
+                () -> reservationService.cancelar(reservaId)
+        );
+
+        assertEquals("PAGO_PENDIENTE", exception.getCode());
+        assertEquals(EstadoReserva.PENDIENTE, reserva.getEstado());
+        verify(reservationRepository, never()).save(any(Reserva.class));
+    }
+
+    @Test
+    void permiteCancelarTrasRechazoTerminalConfirmadoPorWompi() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.PENDIENTE);
+        Pago pago = pago(reserva, EstadoPago.rechazado);
+        PagoIntento intento = intento(pago, EstadoIntentoPago.rechazado, "DECLINED");
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        when(paymentRepository.findByReservaIdForUpdate(reservaId)).thenReturn(Optional.of(pago));
+        when(paymentAttemptRepository.findByPago_IdPagoOrderByCreatedAtAsc(pago.getIdPago()))
+                .thenReturn(List.of(intento));
+        when(reservationRepository.save(reserva)).thenReturn(reserva);
+
+        reservationService.cancelar(reservaId);
+
+        assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
+    }
+
+    @Test
+    void noAceptaPagoRechazadoSinEstadoWompiFinalConocido() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.PENDIENTE);
+        Pago pago = pago(reserva, EstadoPago.rechazado);
+        PagoIntento intento = intento(pago, EstadoIntentoPago.rechazado, null);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+        when(paymentRepository.findByReservaIdForUpdate(reservaId)).thenReturn(Optional.of(pago));
+        when(paymentAttemptRepository.findByPago_IdPagoOrderByCreatedAtAsc(pago.getIdPago()))
+                .thenReturn(List.of(intento));
+
+        ReservaCancelacionConflictException exception = assertThrows(
+                ReservaCancelacionConflictException.class,
+                () -> reservationService.cancelar(reservaId)
+        );
+
+        assertEquals("PAGO_PENDIENTE", exception.getCode());
+    }
+
+    @Test
+    void cancelacionRepetidaEsIdempotenteYNoDuplicaNotificacion() {
+        UUID reservaId = UUID.randomUUID();
+        Reserva reserva = reserva(reservaId, EstadoReserva.CANCELADA);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+
+        reservationService.cancelar(reservaId);
+        reservationService.cancelar(reservaId);
+
+        verify(paymentRepository, never()).findByReservaIdForUpdate(reservaId);
+        verify(notificationService, never()).crear(any(), any(), any(), any(), any(), any(), any());
+        verify(reservationRepository, never()).save(any(Reserva.class));
+    }
+
+    @Test
+    void cancelacionDeReservaAjenaEsDenegadaAntesDeConsultarPago() {
+        UUID reservaId = UUID.randomUUID();
+        User otro = new User();
+        otro.setUserId(UUID.randomUUID());
+        Reserva reserva = reserva(reservaId, EstadoReserva.PENDIENTE);
+        reserva.setUsuario(otro);
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> reservationService.cancelar(reservaId));
+
+        verify(paymentRepository, never()).findByReservaIdForUpdate(reservaId);
+    }
+
+    @Test
+    void cancelacionDeReservaInexistenteDevuelve404() {
+        UUID reservaId = UUID.randomUUID();
+        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.empty());
+
+        assertThrows(com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException.class,
+                () -> reservationService.cancelar(reservaId));
+        verifyNoInteractions(paymentRepository);
+    }
+
+    private Pago pago(Reserva reserva, EstadoPago estado) {
+        return Pago.builder().idPago(UUID.randomUUID()).reserva(reserva)
+                .monto(new BigDecimal("25000")).estado(estado).build();
+    }
+
+    private PagoIntento intento(Pago pago, EstadoIntentoPago estado, String estadoWompi) {
+        return PagoIntento.builder().idIntento(UUID.randomUUID()).pago(pago)
+                .referencia("PAGO-prueba").wompiStatus(estadoWompi)
+                .estado(estado).build();
     }
 
     private Reserva reserva(UUID id, EstadoReserva estado) {

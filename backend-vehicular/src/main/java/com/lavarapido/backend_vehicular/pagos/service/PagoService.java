@@ -151,11 +151,13 @@ public class PagoService {
     public PagoResponseDTO reconciliar(UUID idReserva) {
         // Camino manual para ADMIN: pregunta a Wompi por intentos pendientes
         // que ya tengan ID remoto, por si el webhook no llego o se retraso.
+        // Primero consulta Wompi sin tomar bloqueos; luego serializa cada
+        // actualizacion usando el mismo orden de bloqueos que la cancelacion.
         User usuario = obtenerUsuarioAutenticado();
         if (!esAdmin(usuario)) {
             throw new AccessDeniedException("Solo ADMIN puede reconciliar pagos con Wompi");
         }
-        Pago pago = pagoRepository.findByReservaIdForUpdate(idReserva)
+        Pago pago = pagoRepository.findByReserva_IdReserva(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Pago no encontrado para la reserva"));
         List<PagoIntento> pendientes = intentoRepository
                 .findByPago_IdPagoAndEstadoOrderByCreatedAtAsc(pago.getIdPago(), EstadoIntentoPago.pendiente)
@@ -167,17 +169,26 @@ public class PagoService {
                     "No hay un intento pendiente con identificador de transaccion para consultar en Wompi");
         }
 
+        List<TransaccionWompi> transacciones = new java.util.ArrayList<>();
         for (PagoIntento intento : pendientes) {
-            // No se acepta cualquier respuesta remota: su referencia debe ser
-            // la del intento local y se bloquea ese intento antes de actualizarlo.
             JsonNode transaction = transactionClient.consultar(intento.getWompiTransactionId());
-            String reference = textoTransaccion(transaction, "reference", null);
-            if (!intento.getReferencia().equals(reference)) {
+            TransaccionWompi datos = leerTransaccion(transaction);
+            if (!intento.getReferencia().equals(datos.referencia())
+                    || !intento.getWompiTransactionId().equals(datos.id())) {
                 throw new WompiEventoInvalidoException("La transaccion consultada no coincide con el intento local");
             }
-            PagoIntento bloqueado = intentoRepository.findByReferenciaForUpdate(reference)
+            transacciones.add(datos);
+        }
+
+        for (TransaccionWompi datos : transacciones) {
+            reservaRepository.findByIdForUpdate(idReserva)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
+            PagoIntento bloqueado = intentoRepository.findByReferenciaForUpdate(datos.referencia())
                     .orElseThrow(() -> new PagoConflictException("El intento dejo de estar disponible"));
-            aplicarTransaccion(bloqueado, leerTransaccion(transaction), configurationService.ambienteEventoEsperado());
+            if (!bloqueado.getPago().getIdPago().equals(pago.getIdPago())) {
+                throw new AccessDeniedException("El intento no pertenece a esta reserva");
+            }
+            aplicarTransaccion(bloqueado, datos, configurationService.ambienteEventoEsperado());
         }
         return response(pago);
     }
@@ -204,6 +215,8 @@ public class PagoService {
         if (!transactionId.equals(datos.id()) || !referencia.equals(datos.referencia())) {
             throw new WompiEventoInvalidoException("La transaccion consultada no coincide con el intento local");
         }
+        reservaRepository.findByIdForUpdate(idReserva)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         PagoIntento intento = intentoRepository.findByReferenciaForUpdate(referencia)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Intento de pago no encontrado"));
         if (!intento.getPago().getIdPago().equals(pago.getIdPago())) {
@@ -217,11 +230,23 @@ public class PagoService {
         TransaccionWompi datos = leerTransaccion(transaction);
         // El webhook localiza el intento por la referencia firmada por Wompi.
         // Si no es un intento nuestro, se registra y se ignora sin crear pagos.
+        PagoIntento encontrado = intentoRepository.findByReferencia(datos.referencia())
+                .orElse(null);
+        if (encontrado == null) {
+            log.info("Evento Wompi firmado ignorado: referencia no registrada={}", datos.referencia());
+            return ResultadoEvento.IGNORADO;
+        }
+        UUID idReserva = encontrado.getPago().getReserva().getIdReserva();
+        reservaRepository.findByIdForUpdate(idReserva)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         PagoIntento intento = intentoRepository.findByReferenciaForUpdate(datos.referencia())
                 .orElse(null);
         if (intento == null) {
-            log.info("Evento Wompi firmado ignorado: referencia no registrada={}", datos.referencia());
+            log.info("Evento Wompi firmado ignorado: referencia dejó de estar registrada={}", datos.referencia());
             return ResultadoEvento.IGNORADO;
+        }
+        if (!intento.getPago().getIdPago().equals(encontrado.getPago().getIdPago())) {
+            throw new PagoConflictException("La referencia de Wompi cambio de pago asociado");
         }
         return aplicarTransaccion(intento, datos, ambiente);
     }

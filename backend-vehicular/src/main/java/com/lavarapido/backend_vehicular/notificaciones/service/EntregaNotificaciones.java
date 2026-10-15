@@ -6,6 +6,7 @@ import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.Map;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,22 @@ public class EntregaNotificaciones {
         this.dispositivos = dispositivos; this.usuarios = usuarios; this.mail = mail;
     }
 
+    @PostConstruct
+    void registrarConfiguracion() {
+        if (pushEnabled) log.info("Entrega de notificaciones push habilitada");
+        else log.warn("Entrega de notificaciones push deshabilitada; configure APP_NOTIFICACIONES_PUSH_ENABLED=true");
+    }
+
+    static Map<String, Object> crearPayloadPush(Notificacion notificacion, DispositivoPush dispositivo) {
+        return Map.of(
+                "to", dispositivo.token,
+                "title", notificacion.titulo,
+                "body", notificacion.mensaje,
+                "channelId", "general",
+                "priority", "high",
+                "data", Map.of("notificacionId", notificacion.id.toString()));
+    }
+
     private static RestClient crearClientePush() {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
@@ -61,8 +78,7 @@ public class EntregaNotificaciones {
                     if (!d.activo || !d.usuarioId.equals(n.usuarioId)) { entrega.estado = "fallida"; entrega.ultimoError = "Dispositivo inactivo"; entregas.save(entrega); continue; }
                     @SuppressWarnings("unchecked")
                     Map<String, Object> response = push.post().uri("/--/api/v2/push/send")
-                            .body(Map.of("to", d.token, "title", n.titulo, "body", n.mensaje,
-                                    "data", Map.of("notificacionId", n.id.toString())))
+                            .body(crearPayloadPush(n, d))
                             .retrieve().body(Map.class);
                     Object data = response == null ? null : response.get("data");
                     if (data instanceof java.util.List<?> list && !list.isEmpty()) data = list.get(0);

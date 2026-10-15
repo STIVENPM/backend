@@ -18,6 +18,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class EntregaNotificacionesTest {
+    @Test void payloadPushEsVisibleYUsaElCanalAndroidConfigurado() {
+        var notification = new Notificacion();
+        notification.id = UUID.randomUUID(); notification.titulo = "Reserva confirmada";
+        notification.mensaje = "Tu reserva fue confirmada";
+        var device = new DispositivoPush(); device.token = "ExpoPushToken[test]";
+
+        var payload = EntregaNotificaciones.crearPayloadPush(notification, device);
+
+        assertEquals(device.token, payload.get("to"));
+        assertEquals(notification.titulo, payload.get("title"));
+        assertEquals(notification.mensaje, payload.get("body"));
+        assertEquals("general", payload.get("channelId"));
+        assertEquals("high", payload.get("priority"));
+        assertEquals(notification.id.toString(), ((java.util.Map<?, ?>) payload.get("data")).get("notificacionId"));
+    }
+
     @Test void falloSmtpAgendaReintentoYWorkerLoRecupera() {
         var deliveries = mock(NotificacionEntregaRepository.class);
         var notifications = mock(NotificacionRepository.class);

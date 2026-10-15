@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -83,7 +84,20 @@ class NotificacionServiceTest {
         verify(deliveries).save(argThat(e -> "email".equals(e.canal) && e.notificacionId != null));
     }
 
-    @Test void rotaYDesactivaElDispositivoDeLaCuentaActual() {
+    @Test void registraTokenNuevoSinCrearDuplicados() {
+        when(devices.findByToken("ExpoPushToken[fresh]")).thenReturn(Optional.empty());
+        when(devices.findByUsuarioIdAndInstalacionId(id, "install-fresh")).thenReturn(Optional.empty());
+
+        service.registrarDispositivo("install-fresh", "ExpoPushToken[fresh]");
+
+        verify(devices).save(argThat(device -> id.equals(device.usuarioId)
+                && "install-fresh".equals(device.instalacionId)
+                && "ExpoPushToken[fresh]".equals(device.token)
+                && device.activo));
+        verify(devices, times(2)).bloquearRegistro(anyString());
+    }
+
+    @Test void registraTokenNuevoRotaYDesactivaElDispositivoDeLaCuentaActual() {
         DispositivoPush device = new DispositivoPush();
         device.id = UUID.randomUUID(); device.usuarioId = id;
         device.instalacionId = "install-123"; device.token = "ExpoPushToken[old]";
@@ -95,19 +109,75 @@ class NotificacionServiceTest {
         service.desactivarDispositivo("install-123");
         assertFalse(device.activo);
         verify(devices, times(2)).save(device);
+        verify(devices, times(2)).bloquearRegistro(anyString());
     }
 
-    @Test void transferenciaDeTokenRevocaAsociacionAnterior() {
+    @Test void registrarMismoTokenEsIdempotenteYReactivaLaMismaFila() {
+        DispositivoPush existente = new DispositivoPush();
+        existente.id = UUID.randomUUID(); existente.usuarioId = id;
+        existente.instalacionId = "install-same"; existente.token = "ExponentPushToken[same]";
+        existente.activo = false;
+        when(devices.findByToken(existente.token)).thenReturn(Optional.of(existente));
+        when(devices.findByUsuarioIdAndInstalacionId(id, existente.instalacionId))
+                .thenReturn(Optional.of(existente));
+
+        service.registrarDispositivo(existente.instalacionId, existente.token);
+        service.registrarDispositivo(existente.instalacionId, existente.token);
+
+        assertTrue(existente.activo);
+        verify(devices, times(2)).save(same(existente));
+        verify(devices, never()).saveAndFlush(any());
+    }
+
+    @Test void noPermiteApropiarseDelTokenActivoDeOtroUsuario() {
         DispositivoPush anterior = new DispositivoPush();
         anterior.id = UUID.randomUUID(); anterior.usuarioId = UUID.randomUUID();
         anterior.instalacionId = "install-old"; anterior.token = "ExpoPushToken[same]"; anterior.activo = true;
         when(devices.findByToken("ExpoPushToken[same]")).thenReturn(Optional.of(anterior));
-        when(devices.findByUsuarioIdAndInstalacionId(id, "install-new")).thenReturn(Optional.empty());
-        service.registrarDispositivo("install-new", "ExpoPushToken[same]");
-        assertFalse(anterior.activo);
-        assertEquals("revoked-" + anterior.id, anterior.token);
-        verify(devices).saveAndFlush(anterior);
-        verify(devices).save(argThat(d -> d.usuarioId.equals(id) && d.activo));
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.registrarDispositivo("install-new", "ExpoPushToken[same]"));
+
+        assertTrue(anterior.activo);
+        assertEquals("ExpoPushToken[same]", anterior.token);
+        verify(devices, never()).save(any());
+    }
+
+    @Test void permiteCambioDeUsuarioSoloTrasDesactivacionEnLaMismaInstalacion() {
+        DispositivoPush anterior = new DispositivoPush();
+        anterior.id = UUID.randomUUID(); anterior.usuarioId = UUID.randomUUID();
+        anterior.instalacionId = "install-shared"; anterior.token = "ExpoPushToken[shared]";
+        anterior.activo = false;
+        when(devices.findByToken(anterior.token)).thenReturn(Optional.of(anterior));
+        when(devices.findByUsuarioIdAndInstalacionId(id, anterior.instalacionId)).thenReturn(Optional.empty());
+
+        service.registrarDispositivo(anterior.instalacionId, anterior.token);
+
+        assertEquals(id, anterior.usuarioId);
+        assertTrue(anterior.activo);
+        verify(devices).save(same(anterior));
+    }
+
+    @Test void consolidaFilasDelMismoUsuarioSinViolarLasDosRestriccionesUnicas() {
+        DispositivoPush porToken = new DispositivoPush();
+        porToken.id = UUID.randomUUID(); porToken.usuarioId = id;
+        porToken.instalacionId = "install-old"; porToken.token = "ExpoPushToken[canonical]";
+        DispositivoPush porInstalacion = new DispositivoPush();
+        porInstalacion.id = UUID.randomUUID(); porInstalacion.usuarioId = id;
+        porInstalacion.instalacionId = "install-current"; porInstalacion.token = "ExpoPushToken[stale]";
+        when(devices.findByToken(porToken.token)).thenReturn(Optional.of(porToken));
+        when(devices.findByUsuarioIdAndInstalacionId(id, porInstalacion.instalacionId))
+                .thenReturn(Optional.of(porInstalacion));
+
+        service.registrarDispositivo("install-current", porToken.token);
+
+        assertFalse(porInstalacion.activo);
+        assertEquals("revoked-" + porInstalacion.id, porInstalacion.token);
+        assertEquals("revoked-" + porInstalacion.id, porInstalacion.instalacionId);
+        assertEquals("install-current", porToken.instalacionId);
+        assertTrue(porToken.activo);
+        verify(devices).saveAndFlush(same(porInstalacion));
+        verify(devices).save(same(porToken));
     }
 
     @Test void alertaAdministrativaSoloSeCreaParaAdministradoresActivos() {

@@ -5,9 +5,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Busca instalaciones y tokens push asociados a los usuarios para entregar notificaciones. */
 public interface DispositivoPushRepository extends JpaRepository<DispositivoPush, UUID> {
+    // Serializa registros concurrentes incluso cuando todavía no existe una fila
+    // que pueda bloquearse. La transacción libera el advisory lock automáticamente.
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))", nativeQuery = true)
+    void bloquearRegistro(String lockKey);
     // Obtiene los dispositivos habilitados a los que se puede intentar enviar un push.
     List<DispositivoPush> findByUsuarioIdAndActivoTrue(UUID usuarioId);
     // Reconoce una instalación concreta para actualizar su token sin duplicarla.

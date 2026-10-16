@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
@@ -81,6 +82,12 @@ public class ReservaService {
             throw new IllegalStateException("El servicio está inactivo y no puede reservarse");
         }
 
+        if (request.getFechaReserva() == null || request.getHoraReserva() == null) {
+            throw new HorarioReservaInvalidoException("La fecha y hora de la reserva son obligatorias");
+        }
+        if (!LocalDateTime.of(request.getFechaReserva(), request.getHoraReserva()).isAfter(LocalDateTime.now(ZoneId.of("America/Bogota")))) {
+            throw new HorarioReservaInvalidoException("La hora elegida ya pas\u00f3. Selecciona una fecha y hora futuras");
+        }
         validarHoraReserva(request.getHoraReserva());
 
         LocalTime horaFin = request.getHoraReserva().plusMinutes(servicio.getDuracionMinutos());

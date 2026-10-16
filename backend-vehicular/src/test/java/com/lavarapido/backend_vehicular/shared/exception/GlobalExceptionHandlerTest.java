@@ -3,6 +3,7 @@ package com.lavarapido.backend_vehicular.shared.exception;
 import org.junit.jupiter.api.Test;
 import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
+import com.lavarapido.backend_vehicular.vehiculos.exception.PlacaVehiculoInvalidaException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,5 +35,22 @@ class GlobalExceptionHandlerTest {
         assertEquals(409, response.getStatusCode().value());
         assertEquals("PAGO_PENDIENTE", response.getBody().get("code"));
         assertEquals("No se puede confirmar", response.getBody().get("error"));
+    }
+
+    @Test
+    void invalidVehiclePlateReturnsClearBadRequest() {
+        var response = new GlobalExceptionHandler().handleInvalidVehiclePlate(
+                new PlacaVehiculoInvalidaException("Para MOTO, la placa debe tener el formato ABC12D"));
+
+        assertEquals(400, response.getStatusCode().value());
+        assertEquals("Para MOTO, la placa debe tener el formato ABC12D", response.getBody().get("error"));
+    }
+
+    @Test
+    void duplicateVehiclePlateKeepsConflictStatus() {
+        var response = new GlobalExceptionHandler().handleIllegalState(
+                new IllegalStateException("Ya existe un vehículo registrado con esa placa"));
+
+        assertEquals(409, response.getStatusCode().value());
     }
 }

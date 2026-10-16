@@ -10,6 +10,7 @@ import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoRequestDTO;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoResponseDTO;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
+import com.lavarapido.backend_vehicular.vehiculos.validation.PlacaVehiculoValidator;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,14 @@ public class VehiculoService {
     private final VehiculoRepository vehiculoRepository;
     private final MarcaRepository marcaRepository;
     private final AccountAccessService accountAccessService;
-    public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository, AccountAccessService accountAccessService) { this.vehiculoRepository=vehiculoRepository; this.marcaRepository=marcaRepository; this.accountAccessService=accountAccessService; }
+    private final PlacaVehiculoValidator placaVehiculoValidator;
+    public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository,
+            AccountAccessService accountAccessService, PlacaVehiculoValidator placaVehiculoValidator) {
+        this.vehiculoRepository = vehiculoRepository;
+        this.marcaRepository = marcaRepository;
+        this.accountAccessService = accountAccessService;
+        this.placaVehiculoValidator = placaVehiculoValidator;
+    }
 
     // ── CREAR ──────────────────────────────────────────────────────
     // Asocia el vehículo a la cuenta autenticada y valida la marca.
@@ -33,8 +41,7 @@ public class VehiculoService {
 
         User usuarioAutenticado = obtenerUsuarioAutenticado();
 
-        // Normaliza la placa a mayúsculas (el CHECK de la BD exige [A-Z]).
-        String placaNormalizada = dto.placa().toUpperCase();
+        String placaNormalizada = placaVehiculoValidator.normalizarYValidar(dto.placa(), dto.tipoVehiculo());
 
         if (vehiculoRepository.existsByPlaca(placaNormalizada)) {
             throw new IllegalStateException("Ya existe un vehículo registrado con esa placa");
@@ -93,7 +100,7 @@ public class VehiculoService {
 
         validarPropietarioOAdmin(vehiculo, usuarioAutenticado);
 
-        String placaNormalizada = dto.placa().toUpperCase();
+        String placaNormalizada = placaVehiculoValidator.normalizarYValidar(dto.placa(), dto.tipoVehiculo());
 
         // Si cambió la placa, valida que la nueva no choque con otro vehículo.
         if (!placaNormalizada.equals(vehiculo.getPlaca())

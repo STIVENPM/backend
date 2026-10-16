@@ -11,6 +11,7 @@ import com.lavarapido.backend_vehicular.reservas.exception.EstadoReservaInvalido
 import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.reservas.exception.VehiculoNoPerteneceUsuarioException;
 import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
+import com.lavarapido.backend_vehicular.vehiculos.exception.PlacaVehiculoInvalidaException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -140,6 +141,11 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage())
                 .orElse("La solicitud no es valida");
         return response(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(PlacaVehiculoInvalidaException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidVehiclePlate(PlacaVehiculoInvalidaException exception) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

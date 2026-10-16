@@ -64,10 +64,14 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.FORBIDDEN, "No tienes permiso para esta operacion");
     }
 
-    @ExceptionHandler({HorarioReservaInvalidoException.class, EstadoReservaInvalidoException.class})
-    public ResponseEntity<Map<String, String>> handleInvalidReservation(RuntimeException exception) {
-        // Horario o cambio de estado invalido se considera solicitud incorrecta.
-        return response(HttpStatus.BAD_REQUEST, "Horario o estado de reserva invalido");
+    @ExceptionHandler(HorarioReservaInvalidoException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidSchedule(HorarioReservaInvalidoException exception) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(EstadoReservaInvalidoException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidReservation(EstadoReservaInvalidoException exception) {
+        return response(HttpStatus.BAD_REQUEST, "Estado de reserva invalido");
     }
 
     @ExceptionHandler(AuthenticationException.class)

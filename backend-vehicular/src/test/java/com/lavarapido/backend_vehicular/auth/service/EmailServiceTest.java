@@ -45,7 +45,7 @@ class EmailServiceTest {
         });
         server.start();
         try {
-            service(server).enviarCorreoRecuperacion("user@example.test", "token+con espacio/á");
+            service(server).enviarCorreoRecuperacion("user@example.test", "token+con espacio/á<&");
 
             var json = objectMapper.readTree(body.get());
             assertEquals("POST", method.get());
@@ -53,12 +53,18 @@ class EmailServiceTest {
             assertEquals("application/json", contentType.get());
             assertEquals("application/json", accept.get());
             assertEquals("noreply@example.test", json.path("sender").path("email").asString());
+            assertEquals("Lava Rápido Vehicular", json.path("sender").path("name").asString());
             assertEquals("user@example.test", json.path("to").get(0).path("email").asString());
             assertEquals("Recuperación de contraseña – Lava Rápido Vehicular", json.path("subject").asString());
             assertTrue(json.path("textContent").asString().contains(
-                    "https://app.example.test/reset-password?token=token%2Bcon+espacio%2F%C3%A1"));
-            assertTrue(json.path("textContent").asString().contains("token+con espacio/á"));
+                    "https://app.example.test/reset-password?token=token%2Bcon+espacio%2F%C3%A1%3C%26"));
+            assertTrue(json.path("textContent").asString().contains("token+con espacio/á<&"));
             assertTrue(json.path("textContent").asString().contains("válido por 30 minutos"));
+            String html = json.path("htmlContent").asString();
+            assertTrue(html.contains("Restablece tu contraseña"));
+            assertTrue(html.contains("href=\"https://app.example.test/reset-password?token=token%2Bcon+espacio%2F%C3%A1%3C%26\""));
+            assertTrue(html.contains("token+con espacio/á&lt;&amp;"));
+            assertTrue(html.contains("30 minutos"));
         } finally {
             server.stop(0);
         }

@@ -39,7 +39,7 @@ public class ServicioService {
 
     // Consulta todos los servicios.
     public List<ServicioResponseDTO> listarTodos() {
-        return servicioRepository.findByEstadoTrue()
+        return servicioRepository.findAll()
                 .stream()
                 .map(this::mapearAResponse)
                 .collect(Collectors.toList());

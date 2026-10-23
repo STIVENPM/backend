@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.lavarapido.backend_vehicular.servicios.dto.ServicioRequestDTO;
 import com.lavarapido.backend_vehicular.servicios.dto.ServicioResponseDTO;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
+import com.lavarapido.backend_vehicular.servicios.exception.DuplicateServiceNameException;
 import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 
 
@@ -22,7 +23,7 @@ public class ServicioService {
     // Evita nombres repetidos y guarda el servicio activo.
     public ServicioResponseDTO crear(ServicioRequestDTO request) {
         if (servicioRepository.existsByNombre(request.getNombre())) {
-            throw new IllegalArgumentException("Ya existe un servicio con ese nombre");
+            throw new DuplicateServiceNameException();
         }
 
         Servicio servicio = new Servicio();
@@ -74,7 +75,7 @@ public class ServicioService {
 
         if (!servicio.getNombre().equalsIgnoreCase(request.getNombre())
                 && servicioRepository.existsByNombre(request.getNombre())) {
-            throw new IllegalArgumentException("Ya existe un servicio con ese nombre");
+            throw new DuplicateServiceNameException();
         }
 
         servicio.setNombre(request.getNombre());

@@ -12,6 +12,7 @@ import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionCon
 import com.lavarapido.backend_vehicular.reservas.exception.VehiculoNoPerteneceUsuarioException;
 import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 import com.lavarapido.backend_vehicular.vehiculos.exception.PlacaVehiculoInvalidaException;
+import com.lavarapido.backend_vehicular.servicios.exception.DuplicateServiceNameException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -90,6 +91,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleConflict(DataIntegrityViolationException exception) {
         // Una restriccion de BD, como una clave unica, se presenta como 409.
         return response(HttpStatus.CONFLICT, "Los datos entran en conflicto con un registro existente");
+    }
+
+    @ExceptionHandler(DuplicateServiceNameException.class)
+    public ResponseEntity<Map<String, String>> handleDuplicateServiceName(
+            DuplicateServiceNameException exception) {
+        return response(HttpStatus.CONFLICT, exception.getMessage());
     }
 
     @ExceptionHandler(DataAccessException.class)

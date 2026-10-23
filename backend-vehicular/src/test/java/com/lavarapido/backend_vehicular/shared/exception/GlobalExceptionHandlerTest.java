@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
 import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 import com.lavarapido.backend_vehicular.vehiculos.exception.PlacaVehiculoInvalidaException;
+import com.lavarapido.backend_vehicular.servicios.exception.DuplicateServiceNameException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,5 +53,14 @@ class GlobalExceptionHandlerTest {
                 new IllegalStateException("Ya existe un vehículo registrado con esa placa"));
 
         assertEquals(409, response.getStatusCode().value());
+    }
+
+    @Test
+    void duplicateServiceNameReturnsConflictWithClearMessage() {
+        var response = new GlobalExceptionHandler()
+                .handleDuplicateServiceName(new DuplicateServiceNameException());
+
+        assertEquals(409, response.getStatusCode().value());
+        assertEquals("Ya existe un servicio con ese nombre", response.getBody().get("error"));
     }
 }

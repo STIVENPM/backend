@@ -3,8 +3,12 @@ package com.lavarapido.backend_vehicular.pagos.service;
 import com.lavarapido.backend_vehicular.pagos.config.WompiConfigurationService;
 import com.lavarapido.backend_vehicular.pagos.config.WompiProperties;
 import com.lavarapido.backend_vehicular.pagos.exception.WompiProveedorException;
+import com.sun.net.httpserver.HttpServer;
 import java.time.Duration;
+import java.net.InetSocketAddress;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -62,6 +66,44 @@ class WompiTransactionClientImplTest {
 
         assertEquals("tx-2", client.consultar("tx-2").path("id").asString());
         server.verify();
+    }
+
+    @Test
+    void mapsAControlledSlowProviderToDomainException() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/transactions/slow", exchange -> {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        var executor = Executors.newSingleThreadExecutor();
+        server.setExecutor(executor);
+        server.start();
+
+        try {
+            WompiProperties properties = properties();
+            WompiConfigurationService configuration = mock(WompiConfigurationService.class);
+            doNothing().when(configuration).validarConsulta();
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+            requestFactory.setConnectTimeout(Duration.ofMillis(500));
+            requestFactory.setReadTimeout(Duration.ofMillis(50));
+            RestClient client = RestClient.builder()
+                    .baseUrl("http://127.0.0.1:" + server.getAddress().getPort())
+                    .requestFactory(requestFactory)
+                    .build();
+
+            WompiTransactionClientImpl transactionClient = new WompiTransactionClientImpl(
+                    properties, configuration, client);
+
+            assertThrows(WompiProveedorException.class, () -> transactionClient.consultar("slow"));
+        } finally {
+            server.stop(0);
+            executor.shutdownNow();
+        }
     }
 
     private WompiProperties properties() {

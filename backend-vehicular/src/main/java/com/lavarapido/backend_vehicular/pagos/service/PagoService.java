@@ -55,6 +55,7 @@ public class PagoService {
     private final WompiSignatureService signatureService;
     private final WompiTransactionClient transactionClient;
     private final NotificacionService notificacionService;
+    private final PagoTransactionExecutor transactionExecutor;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -147,7 +148,6 @@ public class PagoService {
     }
 
     // Solo un admin consulta en Wompi intentos pendientes conocidos.
-    @Transactional
     public PagoResponseDTO reconciliar(UUID idReserva) {
         // Camino manual para ADMIN: pregunta a Wompi por intentos pendientes
         // que ya tengan ID remoto, por si el webhook no llego o se retraso.
@@ -180,21 +180,26 @@ public class PagoService {
             transacciones.add(datos);
         }
 
+        PagoResponseDTO respuesta = null;
         for (TransaccionWompi datos : transacciones) {
-            reservaRepository.findByIdForUpdate(idReserva)
-                    .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
-            PagoIntento bloqueado = intentoRepository.findByReferenciaForUpdate(datos.referencia())
-                    .orElseThrow(() -> new PagoConflictException("El intento dejo de estar disponible"));
-            if (!bloqueado.getPago().getIdPago().equals(pago.getIdPago())) {
-                throw new AccessDeniedException("El intento no pertenece a esta reserva");
-            }
-            aplicarTransaccion(bloqueado, datos, configurationService.ambienteEventoEsperado());
+            respuesta = transactionExecutor.execute(() -> {
+                reservaRepository.findByIdForUpdate(idReserva)
+                        .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
+                PagoIntento bloqueado = intentoRepository.findByReferenciaForUpdate(datos.referencia())
+                        .orElseThrow(() -> new PagoConflictException("El intento dejo de estar disponible"));
+                if (!bloqueado.getPago().getIdPago().equals(pago.getIdPago())) {
+                    throw new AccessDeniedException("El intento no pertenece a esta reserva");
+                }
+                Pago pagoActual = pagoRepository.findByIdForUpdate(pago.getIdPago())
+                        .orElseThrow(() -> new RecursoNoEncontradoException("Pago no encontrado"));
+                aplicarTransaccion(bloqueado, datos, configurationService.ambienteEventoEsperado());
+                return response(pagoActual);
+            });
         }
-        return response(pago);
+        return respuesta;
     }
 
     // Consulta la transacción en Wompi y compara ID y referencia.
-    @Transactional
     public PagoResponseDTO verificar(UUID idReserva, String referencia, String transactionId) {
         // El navegador aporta IDs, pero el servidor consulta directamente a Wompi.
         // Primero se valida longitud, pertenencia de reserva e intento local.
@@ -215,15 +220,19 @@ public class PagoService {
         if (!transactionId.equals(datos.id()) || !referencia.equals(datos.referencia())) {
             throw new WompiEventoInvalidoException("La transaccion consultada no coincide con el intento local");
         }
-        reservaRepository.findByIdForUpdate(idReserva)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
-        PagoIntento intento = intentoRepository.findByReferenciaForUpdate(referencia)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Intento de pago no encontrado"));
-        if (!intento.getPago().getIdPago().equals(pago.getIdPago())) {
-            throw new AccessDeniedException("El intento no pertenece a esta reserva");
-        }
-        aplicarTransaccion(intento, datos, configurationService.ambienteEventoEsperado());
-        return response(pago);
+        return transactionExecutor.execute(() -> {
+            reservaRepository.findByIdForUpdate(idReserva)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
+            PagoIntento intento = intentoRepository.findByReferenciaForUpdate(referencia)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Intento de pago no encontrado"));
+            if (!intento.getPago().getIdPago().equals(pago.getIdPago())) {
+                throw new AccessDeniedException("El intento no pertenece a esta reserva");
+            }
+            Pago pagoActual = pagoRepository.findByIdForUpdate(pago.getIdPago())
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Pago no encontrado"));
+            aplicarTransaccion(intento, datos, configurationService.ambienteEventoEsperado());
+            return response(pagoActual);
+        });
     }
 
     private ResultadoEvento procesarTransaccion(JsonNode transaction, String ambiente) {

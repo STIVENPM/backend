@@ -2,6 +2,7 @@
 package com.lavarapido.backend_vehicular.shared.config;
 
 import com.lavarapido.backend_vehicular.security.JwtAuthenticationFilter;
+import com.lavarapido.backend_vehicular.security.AuthRateLimitFilter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,6 +33,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
+    private final AuthRateLimitFilter authRateLimitFilter;
 
 
     @Bean
@@ -331,6 +333,10 @@ public class SecurityConfig {
             // =========================================================
             // JWT FILTER
             // =========================================================
+            .addFilterBefore(
+                authRateLimitFilter,
+                UsernamePasswordAuthenticationFilter.class
+            )
             .addFilterBefore(
                 // Valida el Bearer antes de que Spring decida los permisos de la ruta.
                 jwtFilter,

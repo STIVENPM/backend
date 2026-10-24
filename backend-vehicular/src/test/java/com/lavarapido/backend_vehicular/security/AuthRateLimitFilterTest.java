@@ -75,6 +75,30 @@ class AuthRateLimitFilterTest {
         }
     }
 
+    @Test
+    void forwardedHeadersCannotOverrideTheSocketAddress() throws Exception {
+        AuthRateLimitFilter filter = new AuthRateLimitFilter();
+        FilterChain failedLogin = (request, response) -> ((MockHttpServletResponse) response).setStatus(401);
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/users/login");
+            request.setRemoteAddr("192.0.2.20");
+            request.addHeader("X-Forwarded-For", "198.51.100." + (attempt + 1));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, failedLogin);
+            assertEquals(401, response.getStatus());
+        }
+
+        MockHttpServletRequest blockedRequest = new MockHttpServletRequest("POST", "/api/users/login");
+        blockedRequest.setRemoteAddr("192.0.2.20");
+        blockedRequest.addHeader("X-Forwarded-For", "203.0.113.10");
+        MockHttpServletResponse blockedResponse = new MockHttpServletResponse();
+        filter.doFilter(blockedRequest, blockedResponse, failedLogin);
+
+        assertEquals(429, blockedResponse.getStatus());
+        assertEquals("900", blockedResponse.getHeader("Retry-After"));
+    }
+
     private MockHttpServletResponse invoke(AuthRateLimitFilter filter, String path, String address,
             FilterChain chain) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", path);

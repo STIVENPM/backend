@@ -37,6 +37,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.UUID;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
@@ -63,6 +64,7 @@ class PagoServiceTest {
     private WompiConfigurationService configurationService;
     private PagoService service;
     private NotificacionService notificationService;
+    private PagoTransactionExecutor transactionExecutor;
     private User owner;
     private Reserva reserva;
     private Pago pago;
@@ -85,9 +87,12 @@ class PagoServiceTest {
         configurationService = new WompiConfigurationService(properties);
         WompiSignatureService signatureService = new WompiSignatureService(properties, configurationService);
         notificationService = mock(NotificacionService.class);
+        transactionExecutor = mock(PagoTransactionExecutor.class);
+        when(transactionExecutor.execute(any())).thenAnswer(invocation ->
+                ((Supplier<?>) invocation.getArgument(0)).get());
         service = new PagoService(pagoRepository, intentoRepository, reservaRepository,
                 accountAccessService, properties, configurationService, signatureService, transactionClient,
-                notificationService);
+                notificationService, transactionExecutor);
         ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:5173");
 
         owner = new User();

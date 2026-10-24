@@ -3,19 +3,43 @@ package com.lavarapido.backend_vehicular.pagos.service;
 import com.lavarapido.backend_vehicular.pagos.config.WompiConfigurationService;
 import com.lavarapido.backend_vehicular.pagos.config.WompiProperties;
 import com.lavarapido.backend_vehicular.pagos.exception.WompiProveedorException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Duration;
+
 @Component
-@RequiredArgsConstructor
 public class WompiTransactionClientImpl implements WompiTransactionClient {
+    static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
+
     // Implementacion HTTP del contrato usado por verificar y reconciliar.
     private final WompiProperties properties;
     private final WompiConfigurationService configurationService;
+    private final RestClient restClient;
+
+    public WompiTransactionClientImpl(WompiProperties properties,
+            WompiConfigurationService configurationService) {
+        this(properties, configurationService, createClient(configurationService.apiBaseUrl()));
+    }
+
+    WompiTransactionClientImpl(WompiProperties properties,
+            WompiConfigurationService configurationService, RestClient restClient) {
+        this.properties = properties;
+        this.configurationService = configurationService;
+        this.restClient = restClient;
+    }
+
+    private static RestClient createClient(String baseUrl) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
+    }
 
     // Consulta a Wompi con la clave privada y devuelve la transacción.
     @Override
@@ -26,7 +50,7 @@ public class WompiTransactionClientImpl implements WompiTransactionClient {
         try {
             // La llamada GET se hace desde el backend con Bearer privado;
             // el navegador no recibe esa credencial.
-            JsonNode response = RestClient.create(configurationService.apiBaseUrl())
+            JsonNode response = restClient
                     .get()
                     .uri("/transactions/{id}", transactionId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getPrivateKey())

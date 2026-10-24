@@ -5,6 +5,7 @@ import com.lavarapido.backend_vehicular.pagos.config.WompiProperties;
 import com.lavarapido.backend_vehicular.pagos.exception.WompiProveedorException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -22,6 +23,7 @@ public class WompiTransactionClientImpl implements WompiTransactionClient {
     private final WompiConfigurationService configurationService;
     private final RestClient restClient;
 
+    @Autowired
     public WompiTransactionClientImpl(WompiProperties properties,
             WompiConfigurationService configurationService) {
         this(properties, configurationService, createClient(configurationService.apiBaseUrl()));

@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -364,6 +365,9 @@ class PagoServiceTest {
         assertEquals("aprobado", response.estado());
         assertEquals("APPROVED", response.intentoActual().wompiStatus());
         assertEquals(EstadoReserva.PENDIENTE, reserva.getEstado());
+        InOrder order = inOrder(transactionClient, transactionExecutor);
+        order.verify(transactionClient).consultar("tx-1");
+        order.verify(transactionExecutor).execute(any());
     }
 
     @Test
@@ -395,6 +399,9 @@ class PagoServiceTest {
         assertEquals("aprobado", response.estado());
         assertEquals("tx-1", intento.getWompiTransactionId());
         assertEquals("CARD", intento.getWompiPaymentMethodType());
+        InOrder order = inOrder(transactionClient, transactionExecutor);
+        order.verify(transactionClient).consultar("tx-1");
+        order.verify(transactionExecutor).execute(any());
     }
 
     @Test

@@ -109,6 +109,7 @@ public class SecurityConfig {
 
                     "/error"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/healthz").permitAll()
                 // Salud publica para diagnosticar el backend sin iniciar sesion.
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
 

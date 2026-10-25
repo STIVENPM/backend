@@ -1,8 +1,23 @@
+# Run against a disposable local API and database. Set LOCAL_TEST_ADMIN_EMAIL,
+# LOCAL_TEST_ADMIN_PASSWORD, and LOCAL_TEST_USER_PASSWORD in the current shell.
+# Use test-only credentials and keep them out of command history and logs.
 param([string]$ApiBase = 'http://localhost:18081')
 
 $ErrorActionPreference = 'Stop'
-if (-not $env:LOCAL_TEST_ADMIN_EMAIL -or -not $env:LOCAL_TEST_ADMIN_PASSWORD) {
-    throw 'Configure LOCAL_TEST_ADMIN_EMAIL y LOCAL_TEST_ADMIN_PASSWORD para una cuenta ADMIN de la base DESECHABLE.'
+if ([string]::IsNullOrWhiteSpace($env:LOCAL_TEST_ADMIN_EMAIL) -or
+    [string]::IsNullOrWhiteSpace($env:LOCAL_TEST_ADMIN_PASSWORD) -or
+    [string]::IsNullOrWhiteSpace($env:LOCAL_TEST_USER_PASSWORD)) {
+    throw 'Set LOCAL_TEST_ADMIN_EMAIL, LOCAL_TEST_ADMIN_PASSWORD, and LOCAL_TEST_USER_PASSWORD for a disposable local database.'
+}
+
+$apiUri = [uri]$ApiBase
+if ($apiUri.Scheme -ne 'http' -or -not $apiUri.IsLoopback) {
+    throw 'ApiBase must be a local HTTP address.'
+}
+
+if ($env:LOCAL_TEST_USER_PASSWORD.Length -lt 8 -or
+    [Text.Encoding]::UTF8.GetByteCount($env:LOCAL_TEST_USER_PASSWORD) -gt 72) {
+    throw 'LOCAL_TEST_USER_PASSWORD must be between 8 characters and 72 UTF-8 bytes.'
 }
 
 function Send-Request([string]$Method, [string]$Path, $Body, [string]$Token) {
@@ -31,7 +46,7 @@ function Assert-Status($Response, [int]$Expected, [string]$Name) {
 $suffix = [Guid]::NewGuid().ToString('N').Substring(0, 10)
 $email = "integration-$suffix@example.invalid"
 $document = "98$((Get-Random -Minimum 10000000 -Maximum 99999999))"
-$password = 'TemporaryLocalPass123!'
+$password = $env:LOCAL_TEST_USER_PASSWORD
 $registration = @{ email = $email; firstName = 'Local'; lastName = 'Test'; phoneNumber = "3$((Get-Random -Minimum 100000000 -Maximum 999999999))"; documentType = 'CC'; documentNumber = $document; password = $password; role = 'ADMIN' }
 
 Assert-Status (Send-Request 'GET' '/actuator/health' $null $null) 200 'health'

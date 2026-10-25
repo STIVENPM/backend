@@ -14,6 +14,7 @@ target
 *.log
 # No envía secretos locales a Docker.
 .env
+.env.*
 # Configuración local de Spring fuera de la imagen.
 application-local.properties
 # Configuración local de Wompi fuera de la imagen.

@@ -165,10 +165,6 @@ public class AsignacionService {
         // Actualizar estado
         asignacion.setEstado(request.estado());
 
-        if (request.estado() == EstadoAsignacion.cancelada) {
-            reservaService.cambiarEstado(asignacion.getReserva().getIdReserva(), EstadoReserva.CANCELADA);
-        }
-
         // Si comienza el servicio
         if (request.estado() == EstadoAsignacion.en_proceso) {
 
@@ -238,14 +234,10 @@ public class AsignacionService {
 
         boolean permitida =
 
-                // ASIGNADA -> EN_PROCESO
-                // ASIGNADA -> CANCELADA
+                // Operators may start assigned work but cannot cancel reservations.
                 (
                         estadoActual == EstadoAsignacion.asignada
-                                && (
-                                nuevoEstado == EstadoAsignacion.en_proceso
-                                        || nuevoEstado == EstadoAsignacion.cancelada
-                        )
+                                && nuevoEstado == EstadoAsignacion.en_proceso
                 )
 
                 ||

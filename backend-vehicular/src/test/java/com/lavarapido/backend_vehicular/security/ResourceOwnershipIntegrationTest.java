@@ -5,6 +5,7 @@ import com.lavarapido.backend_vehicular.asignaciones.entity.Asignacion;
 import com.lavarapido.backend_vehicular.asignaciones.enums.EstadoAsignacion;
 import com.lavarapido.backend_vehicular.asignaciones.repository.AsignacionRepository;
 import com.lavarapido.backend_vehicular.asignaciones.service.AsignacionService;
+import com.lavarapido.backend_vehicular.auditoria.service.AuditoriaService;
 import com.lavarapido.backend_vehicular.marcas.entity.Marca;
 import com.lavarapido.backend_vehicular.marcas.repository.MarcaRepository;
 import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
@@ -79,6 +80,7 @@ class ResourceOwnershipIntegrationTest {
     private final NotificacionService notifications = mock(NotificacionService.class);
     private final PagoRepository payments = mock(PagoRepository.class);
     private final PagoIntentoRepository paymentAttempts = mock(PagoIntentoRepository.class);
+    private final AuditoriaService auditService = mock(AuditoriaService.class);
     private final UUID reservationId = UUID.randomUUID();
     private final UUID vehicleId = UUID.randomUUID();
     private final UUID assignmentId = UUID.randomUUID();
@@ -138,6 +140,7 @@ class ResourceOwnershipIntegrationTest {
             factory.registerSingleton("notificacionService", notifications);
             factory.registerSingleton("pagoRepository", payments);
             factory.registerSingleton("pagoIntentoRepository", paymentAttempts);
+            factory.registerSingleton("auditoriaService", auditService);
         });
         context.register(TestConfiguration.class);
         context.refresh();
@@ -206,6 +209,45 @@ class ResourceOwnershipIntegrationTest {
                 .andExpect(jsonPath("$.estado").value("CANCELADA"));
         assertEquals(EstadoReserva.CANCELADA, reservation.getEstado());
         verify(reservations).save(reservation);
+    }
+
+    @Test
+    void administratorCannotUseCustomerCancellationEndpoint() throws Exception {
+        authenticate(owner, "ADMIN");
+
+        mvc.perform(patch("/api/reservas/{id}/cancelar", reservationId)
+                        .header("Authorization", "Bearer token"))
+                .andExpect(status().isForbidden());
+        assertEquals(EstadoReserva.PENDIENTE, reservation.getEstado());
+        verifyNoInteractions(payments, notifications);
+        verify(reservations, never()).save(any());
+    }
+
+    @Test
+    void administrativeStateEndpointRejectsCancelledState() throws Exception {
+        authenticate(owner, "ADMIN");
+
+        mvc.perform(patch("/api/reservas/{id}/estado", reservationId)
+                        .param("estado", "CANCELADA")
+                        .header("Authorization", "Bearer token"))
+                .andExpect(status().isBadRequest());
+        assertEquals(EstadoReserva.PENDIENTE, reservation.getEstado());
+        verify(reservations, never()).save(any());
+    }
+
+    @Test
+    void ownerCannotCancelAssignedReservation() throws Exception {
+        reservation.setEstado(EstadoReserva.ASIGNADA);
+        when(reservations.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        authenticate(owner, "USER");
+
+        mvc.perform(patch("/api/reservas/{id}/cancelar", reservationId)
+                        .header("Authorization", "Bearer token"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESERVA_NO_PENDIENTE"));
+        assertEquals(EstadoReserva.ASIGNADA, reservation.getEstado());
+        verifyNoInteractions(payments, notifications);
+        verify(reservations, never()).save(any());
     }
 
     @Test
@@ -320,6 +362,25 @@ class ResourceOwnershipIntegrationTest {
                 .andExpect(status().isConflict());
         assertEquals(EstadoAsignacion.asignada, assignment.getEstado());
         verify(assignments, never()).save(any());
+    }
+
+    @Test
+    void operatorCannotCancelReservationThroughAssignmentState() throws Exception {
+        reservation.setEstado(EstadoReserva.ASIGNADA);
+        when(users.findByEmail(operatorUser.getEmail())).thenReturn(Optional.of(operatorUser));
+        when(operators.findByUsuario_UserId(operatorUser.getUserId())).thenReturn(Optional.of(operator));
+        when(assignments.findById(assignmentId)).thenReturn(Optional.of(assignment));
+        authenticate(operatorUser, "OPERATOR");
+
+        mvc.perform(patch("/api/asignaciones/{id}/estado", assignmentId)
+                        .header("Authorization", "Bearer token")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"estado\":\"cancelada\"}"))
+                .andExpect(status().isConflict());
+        assertEquals(EstadoAsignacion.asignada, assignment.getEstado());
+        assertEquals(EstadoReserva.ASIGNADA, reservation.getEstado());
+        verify(assignments, never()).save(any());
+        verify(reservations, never()).save(any());
+        verifyNoInteractions(notifications);
     }
 
     @Test

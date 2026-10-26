@@ -14,7 +14,9 @@ import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
@@ -23,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
@@ -121,6 +124,26 @@ class AuthorizationSecurityIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void onlyCustomerRoleCanReachVoluntaryCancellationEndpoint() throws Exception {
+        UUID reservationId = UUID.randomUUID();
+
+        authenticateAs("USER");
+        mockMvc.perform(patch("/api/reservas/{id}/cancelar", reservationId)
+                        .header("Authorization", "Bearer signed-token"))
+                .andExpect(status().isOk());
+
+        authenticateAs("ADMIN");
+        mockMvc.perform(patch("/api/reservas/{id}/cancelar", reservationId)
+                        .header("Authorization", "Bearer signed-token"))
+                .andExpect(status().isForbidden());
+
+        authenticateAs("OPERATOR");
+        mockMvc.perform(patch("/api/reservas/{id}/cancelar", reservationId)
+                        .header("Authorization", "Bearer signed-token"))
+                .andExpect(status().isForbidden());
+    }
+
     private void authenticateAs(String role) {
         UUID userId = UUID.randomUUID();
         User user = new User();
@@ -183,6 +206,11 @@ class AuthorizationSecurityIntegrationTest {
 
         @PostMapping("/api/pagos/webhook")
         ResponseEntity<Void> paymentWebhook() {
+            return ResponseEntity.ok().build();
+        }
+
+        @PatchMapping("/api/reservas/{id}/cancelar")
+        ResponseEntity<Void> cancelReservation(@PathVariable UUID id) {
             return ResponseEntity.ok().build();
         }
     }

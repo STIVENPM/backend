@@ -336,6 +336,9 @@ class PagoServiceTest {
         assertEquals(EstadoPago.aprobado, pago.getEstado());
         assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
         verify(notificationService).alertarAdministradores(any(), any(), any(), any(), any());
+        InOrder lockOrder = inOrder(reservaRepository, pagoRepository);
+        lockOrder.verify(reservaRepository).findByIdForUpdate(RESERVA_ID);
+        lockOrder.verify(pagoRepository).findByIdForUpdate(PAGO_ID);
     }
 
     @Test

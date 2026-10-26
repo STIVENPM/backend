@@ -2,8 +2,10 @@ package com.lavarapido.backend_vehicular.reservas.controller;
 
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaRequestDTO;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
+import com.lavarapido.backend_vehicular.reservas.dto.ReservationCancellationRequest;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.service.ReservaService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,10 +60,16 @@ public class ReservaController {
         return ResponseEntity.ok(reservaService.cambiarEstado(id, estado));
     }
 
-    // Pide cancelar la reserva sin borrarla.
+    // Cancels without deleting the reservation and records only explicit policy acceptance.
     @PatchMapping("/{id}/cancelar")
-    public ResponseEntity<ReservaResponseDTO> cancelar(@PathVariable UUID id) {
-        ReservaService.ResultadoCancelacion resultado = reservaService.cancelarConResultado(id);
+    public ResponseEntity<ReservaResponseDTO> cancel(
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) ReservationCancellationRequest request,
+            HttpServletRequest httpRequest) {
+        ReservaService.ResultadoCancelacion resultado = reservaService.cancelWithResult(
+                id,
+                request,
+                httpRequest.getRemoteAddr());
         return ResponseEntity.ok()
                 .header("X-Reservation-Cancellation-Result",
                         resultado.yaEstabaCancelada() ? "ALREADY_CANCELLED" : "CANCELLED")

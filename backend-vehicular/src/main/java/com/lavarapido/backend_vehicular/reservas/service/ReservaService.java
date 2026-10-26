@@ -4,6 +4,7 @@ import com.lavarapido.backend_vehicular.asignaciones.entity.Asignacion;
 import com.lavarapido.backend_vehicular.asignaciones.repository.AsignacionRepository;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaRequestDTO;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
+import com.lavarapido.backend_vehicular.reservas.dto.ReservationCancellationRequest;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.exception.EstadoReservaInvalidoException;
@@ -23,6 +24,9 @@ import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoExce
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.auditoria.enums.AccionAuditoria;
+import com.lavarapido.backend_vehicular.auditoria.enums.ModuloAuditoria;
+import com.lavarapido.backend_vehicular.auditoria.service.AuditoriaService;
 import com.lavarapido.backend_vehicular.notificaciones.service.NotificacionService;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
@@ -55,9 +59,10 @@ public class ReservaService {
     private final NotificacionService notificacionService;
     private final PagoRepository pagoRepository;
     private final PagoIntentoRepository pagoIntentoRepository;
+    private final AuditoriaService auditoriaService;
     private static final Set<String> TERMINAL_WOMPI_FAILURES = Set.of("DECLINED", "VOIDED", "ERROR");
 
-    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository, NotificacionService notificacionService, PagoRepository pagoRepository, PagoIntentoRepository pagoIntentoRepository) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; this.notificacionService=notificacionService; this.pagoRepository=pagoRepository; this.pagoIntentoRepository=pagoIntentoRepository; }
+    public ReservaService(ReservaRepository reservaRepository, UserRepository userRepository, AccountAccessService accountAccessService, VehiculoRepository vehiculoRepository, ServicioRepository servicioRepository, AsignacionRepository asignacionRepository, NotificacionService notificacionService, PagoRepository pagoRepository, PagoIntentoRepository pagoIntentoRepository, AuditoriaService auditoriaService) { this.reservaRepository=reservaRepository; this.userRepository=userRepository; this.accountAccessService=accountAccessService; this.vehiculoRepository=vehiculoRepository; this.servicioRepository=servicioRepository; this.asignacionRepository=asignacionRepository; this.notificacionService=notificacionService; this.pagoRepository=pagoRepository; this.pagoIntentoRepository=pagoIntentoRepository; this.auditoriaService=auditoriaService; }
 
     // Comprueba dueño, disponibilidad y horario; guarda precio y duración pactados.
     @Transactional
@@ -160,6 +165,10 @@ public class ReservaService {
     // Aplica la máquina de estados y guarda marcas de tiempo.
     @Transactional
     public ReservaResponseDTO cambiarEstado(UUID idReserva, EstadoReserva nuevoEstado) {
+        if (nuevoEstado == EstadoReserva.CANCELADA) {
+            throw new EstadoReservaInvalidoException(
+                    "La cancelación voluntaria solo puede solicitarla el cliente propietario");
+        }
         Reserva reserva = reservaRepository.findByIdForUpdate(idReserva)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
         return cambiarEstadoBloqueado(reserva, nuevoEstado);
@@ -209,18 +218,70 @@ public class ReservaService {
     // Reutiliza la transición de estado hacia CANCELADA.
     @Transactional
     public ReservaResponseDTO cancelar(UUID idReserva) {
-        return cancelarConResultado(idReserva).reserva();
+        return cancelWithResult(idReserva, null, null).reserva();
     }
 
     @Transactional
     public ResultadoCancelacion cancelarConResultado(UUID idReserva) {
-        Reserva reserva = reservaRepository.findByIdForUpdate(idReserva)
+        return cancelWithResult(idReserva, null, null);
+    }
+
+    @Transactional
+    public ResultadoCancelacion cancelWithResult(
+            UUID reservationId,
+            ReservationCancellationRequest request,
+            String sourceIp) {
+        validatePolicyAcceptance(request);
+        Reserva reserva = reservaRepository.findByIdForUpdate(reservationId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Reserva no encontrada"));
-        validarPropietarioOAdmin(reserva, obtenerUsuarioAutenticado());
+        User authenticatedUser = obtenerUsuarioAutenticado();
+        validateCustomerOwner(reserva, authenticatedUser);
         if (reserva.getEstado() == EstadoReserva.CANCELADA) {
+            recordPolicyAcceptance(request, authenticatedUser, reservationId, sourceIp);
             return new ResultadoCancelacion(mapearAResponse(reserva), true);
         }
-        return new ResultadoCancelacion(cambiarEstadoBloqueado(reserva, EstadoReserva.CANCELADA), false);
+        if (reserva.getEstado() != EstadoReserva.PENDIENTE) {
+            throw new ReservaCancelacionConflictException(
+                    "RESERVA_NO_PENDIENTE",
+                    "Solo se puede cancelar una reserva pendiente");
+        }
+        ResultadoCancelacion result = new ResultadoCancelacion(
+                cambiarEstadoBloqueado(reserva, EstadoReserva.CANCELADA), false);
+        recordPolicyAcceptance(request, authenticatedUser, reservationId, sourceIp);
+        return result;
+    }
+
+    private void validatePolicyAcceptance(ReservationCancellationRequest request) {
+        if (request != null && request.hasPolicyData() && !request.isExplicitAcceptance()) {
+            throw new IllegalArgumentException(
+                    "La aceptación de la política de cancelación y su versión deben enviarse juntas");
+        }
+    }
+
+    private void recordPolicyAcceptance(
+            ReservationCancellationRequest request,
+            User user,
+            UUID reservationId,
+            String sourceIp) {
+        if (request == null || !request.isExplicitAcceptance()) {
+            return;
+        }
+        auditoriaService.registrar(
+                user.getUserId(),
+                AccionAuditoria.registro,
+                "Reservation " + reservationId + " cancellation policy version "
+                        + request.normalizedPolicyVersion() + " explicitly accepted",
+                sourceIp,
+                ModuloAuditoria.reservas);
+    }
+
+    private void validateCustomerOwner(Reserva reserva, User authenticatedUser) {
+        if (!"USER".equals(accountAccessService.currentRole(authenticatedUser))) {
+            throw new AccessDeniedException("Solo el cliente propietario puede cancelar la reserva");
+        }
+        if (!reserva.getUsuario().getUserId().equals(authenticatedUser.getUserId())) {
+            throw new AccessDeniedException("No tienes permiso para cancelar esta reserva");
+        }
     }
 
     private void validarPagoCancelable(UUID idReserva) {

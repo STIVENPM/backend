@@ -4,13 +4,18 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
+/** Recibe correo y contraseña para iniciar sesión; la contraseña solo se usa para compararla con el hash guardado. */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoginDTO {
 
+    @NotBlank @Email
     private String email;
+    @NotBlank
     private String password;
 }

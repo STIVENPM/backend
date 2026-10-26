@@ -5,7 +5,7 @@ import com.lavarapido.backend_vehicular.marcas.dto.MarcaRequestDTO;
 import com.lavarapido.backend_vehicular.marcas.dto.MarcaResponseDTO;
 import com.lavarapido.backend_vehicular.marcas.entity.Marca;
 import com.lavarapido.backend_vehicular.marcas.repository.MarcaRepository;
-import lombok.RequiredArgsConstructor;
+import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,19 +13,21 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class MarcaService {
 
     private final MarcaRepository marcaRepository;
 
+    public MarcaService(MarcaRepository marcaRepository) { this.marcaRepository = marcaRepository; }
+
     // ── CREAR (admin — marca nace ya aprobada) ────────────────────
+    // Normaliza el nombre y crea una marca activa.
     @Transactional
     public MarcaResponseDTO crear(MarcaRequestDTO dto) {
 
         String nombreNormalizado = dto.nombre().trim().toUpperCase();
 
         if (marcaRepository.existsByNombreIgnoreCase(nombreNormalizado)) {
-            throw new RuntimeException("Ya existe una marca con ese nombre");
+            throw new IllegalStateException("Ya existe una marca con ese nombre");
         }
 
         Marca marca = new Marca();
@@ -38,6 +40,7 @@ public class MarcaService {
     }
 
     // ── LISTAR ACTIVAS (catálogo — cliente + admin) ────────────────
+    // Entrega solo marcas disponibles en el catálogo.
     public List<MarcaResponseDTO> listarActivas() {
         return marcaRepository.findByEstadoTrue()
             .stream()
@@ -46,6 +49,15 @@ public class MarcaService {
     }
 
     // ── LISTAR PENDIENTES (panel admin — solicitudes por revisar) ──
+    // Entrega el catálogo completo para administración.
+    public List<MarcaResponseDTO> listarTodas() {
+        return marcaRepository.findAll()
+            .stream()
+            .map(this::mapearAResponse)
+            .toList();
+    }
+
+    // Consulta marcas pendientes de aprobación.
     public List<MarcaResponseDTO> listarPendientes() {
         return marcaRepository.findByEstadoFalse()
             .stream()
@@ -54,6 +66,7 @@ public class MarcaService {
     }
 
     // ── BUSCAR (admin — barra de búsqueda del catálogo completo) ───
+    // Busca marcas por nombre.
     public List<MarcaResponseDTO> buscar(String nombre) {
         return marcaRepository.findByNombreContainingIgnoreCase(nombre)
             .stream()
@@ -62,12 +75,14 @@ public class MarcaService {
     }
 
     // ── OBTENER POR ID ───────────────────────────────────────────────
+    // Recupera una marca por su identificador.
     public MarcaResponseDTO obtenerPorId(UUID idMarca) {
         Marca marca = buscarMarcaOrThrow(idMarca);
         return mapearAResponse(marca);
     }
 
     // ── ACTUALIZAR (admin — ej. corregir nombre mal escrito antes de aprobar) ──
+    // Evita nombres duplicados y guarda el cambio.
     @Transactional
     public MarcaResponseDTO actualizar(UUID idMarca, MarcaRequestDTO dto) {
 
@@ -77,7 +92,7 @@ public class MarcaService {
         // Si cambió el nombre, valida que no choque con otra marca existente.
         if (!nombreNormalizado.equals(marca.getNombre())
                 && marcaRepository.existsByNombreIgnoreCase(nombreNormalizado)) {
-            throw new RuntimeException("Ya existe una marca con ese nombre");
+            throw new IllegalStateException("Ya existe una marca con ese nombre");
         }
 
         marca.setNombre(nombreNormalizado);
@@ -87,6 +102,7 @@ public class MarcaService {
     }
 
     // ── CAMBIAR ESTADO (aprobar una pendiente / activar-desactivar) ──
+    // Aprueba o desactiva la marca sin eliminarla.
     @Transactional
     public MarcaResponseDTO cambiarEstado(UUID idMarca, boolean activo) {
         Marca marca = buscarMarcaOrThrow(idMarca);
@@ -99,7 +115,7 @@ public class MarcaService {
 
     private Marca buscarMarcaOrThrow(UUID idMarca) {
         return marcaRepository.findById(idMarca)
-            .orElseThrow(() -> new RuntimeException("Marca no encontrada"));
+            .orElseThrow(() -> new RecursoNoEncontradoException("Marca no encontrada"));
     }
 
     private MarcaResponseDTO mapearAResponse(Marca marca) {

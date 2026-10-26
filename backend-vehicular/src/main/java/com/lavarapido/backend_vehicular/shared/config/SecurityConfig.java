@@ -245,12 +245,12 @@ public class SecurityConfig {
                 ).hasRole("ADMIN")
 
 
-                // Cancelar reserva -> AUTENTICADO
-                // Esta ruta concreta aparece antes del PATCH general reservado a ADMIN.
+                // Voluntary cancellation is restricted to customers.
+                // Ownership and business rules are enforced again in ReservaService.
                 .requestMatchers(
                     HttpMethod.PATCH,
                     "/api/reservas/*/cancelar"
-                ).authenticated()
+                ).hasRole("USER")
 
 
                 // Otros PATCH de reservas -> ADMIN

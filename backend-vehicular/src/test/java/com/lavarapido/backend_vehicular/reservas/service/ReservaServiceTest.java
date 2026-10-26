@@ -3,9 +3,13 @@ package com.lavarapido.backend_vehicular.reservas.service;
 import com.lavarapido.backend_vehicular.asignaciones.repository.AsignacionRepository;
 import com.lavarapido.backend_vehicular.asignaciones.entity.Asignacion;
 import com.lavarapido.backend_vehicular.asignaciones.enums.EstadoAsignacion;
+import com.lavarapido.backend_vehicular.auditoria.enums.AccionAuditoria;
+import com.lavarapido.backend_vehicular.auditoria.enums.ModuloAuditoria;
+import com.lavarapido.backend_vehicular.auditoria.service.AuditoriaService;
 import com.lavarapido.backend_vehicular.operadores.entity.Operador;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaRequestDTO;
 import com.lavarapido.backend_vehicular.reservas.dto.ReservaResponseDTO;
+import com.lavarapido.backend_vehicular.reservas.dto.ReservationCancellationRequest;
 import com.lavarapido.backend_vehicular.reservas.entity.Reserva;
 import com.lavarapido.backend_vehicular.reservas.enums.EstadoReserva;
 import com.lavarapido.backend_vehicular.reservas.exception.ReservaCancelacionConflictException;
@@ -68,6 +72,7 @@ class ReservaServiceTest {
     private final NotificacionService notificationService = mock(NotificacionService.class);
     private final PagoRepository paymentRepository = mock(PagoRepository.class);
     private final PagoIntentoRepository paymentAttemptRepository = mock(PagoIntentoRepository.class);
+    private final AuditoriaService auditService = mock(AuditoriaService.class);
 
     private final ReservaService reservationService = new ReservaService(
             reservationRepository,
@@ -78,7 +83,8 @@ class ReservaServiceTest {
             assignmentRepository,
             notificationService,
             paymentRepository,
-            paymentAttemptRepository
+            paymentAttemptRepository,
+            auditService
     );
 
     private User user;
@@ -207,20 +213,17 @@ class ReservaServiceTest {
     }
 
     @Test
-    void cancelarReservaAsignadaCancelaAsignacionYNotificaAlPropietario() {
+    void administrativeStateEndpointCannotCancelReservation() {
         UUID reservaId = UUID.randomUUID();
         Reserva reserva = reserva(reservaId, EstadoReserva.ASIGNADA);
-        Asignacion asignacion = Asignacion.builder().reserva(reserva).estado(EstadoAsignacion.asignada).build();
-        Operador operador = new Operador(); operador.setUsuario(user); asignacion.setOperador(operador);
-        when(reservationRepository.findByIdForUpdate(reservaId)).thenReturn(Optional.of(reserva));
-        when(assignmentRepository.findByReserva_IdReserva(reservaId)).thenReturn(Optional.of(asignacion));
-        when(reservationRepository.save(reserva)).thenReturn(reserva);
-        reservationService.cambiarEstado(reservaId, EstadoReserva.CANCELADA);
-        assertEquals(EstadoReserva.CANCELADA, reserva.getEstado());
-        assertEquals(EstadoAsignacion.cancelada, asignacion.getEstado());
-        verify(assignmentRepository).save(asignacion);
-        verify(notificationService).crear(user, "reserva:" + reservaId + ":CANCELADA",
-                "booking", "Reserva cancelada", "Reserva cancelada.", reservaId, null);
+
+        assertThrows(
+                com.lavarapido.backend_vehicular.reservas.exception.EstadoReservaInvalidoException.class,
+                () -> reservationService.cambiarEstado(reservaId, EstadoReserva.CANCELADA));
+
+        assertEquals(EstadoReserva.ASIGNADA, reserva.getEstado());
+        verify(reservationRepository, never()).findByIdForUpdate(reservaId);
+        verifyNoInteractions(paymentRepository, notificationService);
     }
 
     @Test
@@ -315,6 +318,84 @@ class ReservaServiceTest {
         );
 
         assertEquals("PAGO_PENDIENTE", exception.getCode());
+    }
+
+    @Test
+    void assignedReservationCannotBeVoluntarilyCancelled() {
+        UUID reservationId = UUID.randomUUID();
+        Reserva reservation = reserva(reservationId, EstadoReserva.ASIGNADA);
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+
+        ReservaCancelacionConflictException exception = assertThrows(
+                ReservaCancelacionConflictException.class,
+                () -> reservationService.cancelar(reservationId));
+
+        assertEquals("RESERVA_NO_PENDIENTE", exception.getCode());
+        verifyNoInteractions(paymentRepository, notificationService);
+    }
+
+    @Test
+    void administratorCannotCancelEvenWhenItOwnsReservation() {
+        UUID reservationId = UUID.randomUUID();
+        Reserva reservation = reserva(reservationId, EstadoReserva.PENDIENTE);
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(accountAccessService.currentRole(user)).thenReturn("ADMIN");
+
+        assertThrows(
+                org.springframework.security.access.AccessDeniedException.class,
+                () -> reservationService.cancelar(reservationId));
+
+        verifyNoInteractions(paymentRepository, notificationService);
+    }
+
+    @Test
+    void operatorCannotCancelEvenWhenItOwnsReservation() {
+        UUID reservationId = UUID.randomUUID();
+        Reserva reservation = reserva(reservationId, EstadoReserva.PENDIENTE);
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(accountAccessService.currentRole(user)).thenReturn("OPERATOR");
+
+        assertThrows(
+                org.springframework.security.access.AccessDeniedException.class,
+                () -> reservationService.cancelar(reservationId));
+
+        verifyNoInteractions(paymentRepository, notificationService);
+    }
+
+    @Test
+    void explicitPolicyAcceptanceIsAuditedWithoutChangingSchema() {
+        UUID reservationId = UUID.randomUUID();
+        Reserva reservation = reserva(reservationId, EstadoReserva.PENDIENTE);
+        when(reservationRepository.findByIdForUpdate(reservationId)).thenReturn(Optional.of(reservation));
+        when(paymentRepository.findByReservaIdForUpdate(reservationId)).thenReturn(Optional.empty());
+        when(reservationRepository.save(reservation)).thenReturn(reservation);
+
+        reservationService.cancelWithResult(
+                reservationId,
+                new ReservationCancellationRequest(true, " 2026-10-26 "),
+                "192.0.2.25");
+
+        verify(auditService).registrar(
+                USER_ID,
+                AccionAuditoria.registro,
+                "Reservation " + reservationId
+                        + " cancellation policy version 2026-10-26 explicitly accepted",
+                "192.0.2.25",
+                ModuloAuditoria.reservas);
+    }
+
+    @Test
+    void missingExplicitPolicyAcceptanceDoesNotCreateEvidence() {
+        UUID reservationId = UUID.randomUUID();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> reservationService.cancelWithResult(
+                        reservationId,
+                        new ReservationCancellationRequest(false, "2026-10-26"),
+                        "192.0.2.25"));
+
+        verifyNoInteractions(auditService, reservationRepository);
     }
 
     @Test

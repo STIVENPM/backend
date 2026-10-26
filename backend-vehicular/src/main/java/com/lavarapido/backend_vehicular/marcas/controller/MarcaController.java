@@ -5,7 +5,6 @@ import com.lavarapido.backend_vehicular.marcas.dto.MarcaRequestDTO;
 import com.lavarapido.backend_vehicular.marcas.dto.MarcaResponseDTO;
 import com.lavarapido.backend_vehicular.marcas.service.MarcaService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,13 +13,14 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/marcas")
-@RequiredArgsConstructor
 public class MarcaController {
 
     private final MarcaService marcaService;
 
-    // ── Crear marca directamente (admin — ya aprobada) ───────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    public MarcaController(MarcaService marcaService) { this.marcaService = marcaService; }
+
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Valida y crea una marca desde la API.
     @PostMapping
     public ResponseEntity<?> crear(@Valid @RequestBody MarcaRequestDTO dto) {
         try {
@@ -32,31 +32,34 @@ public class MarcaController {
     }
 
     // ── Catálogo aprobado (cliente + admin) ───────────────────────────
+    // Expone el catálogo activo.
     @GetMapping("/activas")
     public ResponseEntity<List<MarcaResponseDTO>> listarActivas() {
         return ResponseEntity.ok(marcaService.listarActivas());
     }
 
-    // ── Solicitudes pendientes de aprobación (admin) ──────────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Expone todas las marcas para administración.
     @GetMapping
     public ResponseEntity<List<MarcaResponseDTO>> listarTodas() {
         return ResponseEntity.ok(marcaService.listarTodas());
     }
 
+    // Expone marcas por revisar.
     @GetMapping("/pendientes")
     public ResponseEntity<List<MarcaResponseDTO>> listarPendientes() {
         return ResponseEntity.ok(marcaService.listarPendientes());
     }
 
-    // ── Búsqueda en el catálogo completo (admin) ──────────────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Recibe el texto de búsqueda.
     @GetMapping("/buscar")
     public ResponseEntity<List<MarcaResponseDTO>> buscar(@RequestParam String nombre) {
         return ResponseEntity.ok(marcaService.buscar(nombre));
     }
 
     // ── Obtener por id ───────────────────────────────────────────────
+    // Busca la marca indicada por UUID.
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerPorId(@PathVariable UUID id) {
         try {
@@ -66,8 +69,8 @@ public class MarcaController {
         }
     }
 
-    // ── Actualizar (corregir nombre — admin) ──────────────────────────
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Valida los cambios de la marca.
     @PutMapping("/{id}")
     public ResponseEntity<?> actualizar(
             @PathVariable UUID id,
@@ -80,8 +83,8 @@ public class MarcaController {
         }
     }
 
-    // ── Cambiar estado (aprobar pendiente / activar-desactivar — admin) ──
-    // TODO: restringir a rol ADMIN cuando exista control de roles.
+    // 🔒 Restringido a ADMIN — regla definida en SecurityConfig
+    // Delega la aprobación o desactivación.
     @PatchMapping("/{id}/estado")
     public ResponseEntity<?> cambiarEstado(
             @PathVariable UUID id,

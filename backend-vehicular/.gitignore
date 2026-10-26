@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Credenciales locales de desarrollo (la plantilla versionada es application-example.properties).
+application-local.properties
+application-wompi-local.properties
+.env
+.env.*
+!.env.example

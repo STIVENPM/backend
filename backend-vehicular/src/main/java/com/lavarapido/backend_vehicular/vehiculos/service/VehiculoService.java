@@ -4,13 +4,15 @@ package com.lavarapido.backend_vehicular.vehiculos.service;
 import com.lavarapido.backend_vehicular.marcas.entity.Marca;
 import com.lavarapido.backend_vehicular.marcas.repository.MarcaRepository;
 import com.lavarapido.backend_vehicular.users.entity.User;
-import com.lavarapido.backend_vehicular.users.repository.UserRepository;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
+import com.lavarapido.backend_vehicular.shared.exception.RecursoNoEncontradoException;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoRequestDTO;
 import com.lavarapido.backend_vehicular.vehiculos.dto.VehiculoResponseDTO;
 import com.lavarapido.backend_vehicular.vehiculos.entity.Vehiculo;
 import com.lavarapido.backend_vehicular.vehiculos.repository.VehiculoRepository;
-import lombok.RequiredArgsConstructor;
+import com.lavarapido.backend_vehicular.vehiculos.validation.PlacaVehiculoValidator;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,27 +20,34 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class VehiculoService {
 
     private final VehiculoRepository vehiculoRepository;
     private final MarcaRepository marcaRepository;
-    private final UserRepository userRepository;
+    private final AccountAccessService accountAccessService;
+    private final PlacaVehiculoValidator placaVehiculoValidator;
+    public VehiculoService(VehiculoRepository vehiculoRepository, MarcaRepository marcaRepository,
+            AccountAccessService accountAccessService, PlacaVehiculoValidator placaVehiculoValidator) {
+        this.vehiculoRepository = vehiculoRepository;
+        this.marcaRepository = marcaRepository;
+        this.accountAccessService = accountAccessService;
+        this.placaVehiculoValidator = placaVehiculoValidator;
+    }
 
     // ── CREAR ──────────────────────────────────────────────────────
+    // Asocia el vehículo a la cuenta autenticada y valida la marca.
     @Transactional
     public VehiculoResponseDTO crear(VehiculoRequestDTO dto) {
 
         User usuarioAutenticado = obtenerUsuarioAutenticado();
 
-        // Normaliza la placa a mayúsculas (el CHECK de la BD exige [A-Z]).
-        String placaNormalizada = dto.placa().toUpperCase();
+        String placaNormalizada = placaVehiculoValidator.normalizarYValidar(dto.placa(), dto.tipoVehiculo());
 
         if (vehiculoRepository.existsByPlaca(placaNormalizada)) {
-            throw new RuntimeException("Ya existe un vehículo registrado con esa placa");
+            throw new IllegalStateException("Ya existe un vehículo registrado con esa placa");
         }
 
-        Marca marca = resolverMarca(dto.fkIdMarca(), dto.marcaSugerida(), usuarioAutenticado);
+        Marca marca = resolverMarca(dto.fkIdMarca());
 
         Vehiculo vehiculo = new Vehiculo();
         vehiculo.setUsuario(usuarioAutenticado);
@@ -53,6 +62,7 @@ public class VehiculoService {
     }
 
     // ── LISTAR "MIS VEHÍCULOS" (app móvil) ────────────────────────
+    // Filtra los vehículos del usuario autenticado.
     public List<VehiculoResponseDTO> listarMisVehiculos() {
         User usuarioAutenticado = obtenerUsuarioAutenticado();
         return vehiculoRepository.findByUsuario_UserIdAndEstadoTrue(usuarioAutenticado.getUserId())
@@ -62,6 +72,7 @@ public class VehiculoService {
     }
 
     // ── LISTAR TODOS (panel admin) ────────────────────────────────
+    // Consulta el inventario de vehículos para administración.
     public List<VehiculoResponseDTO> listarTodos() {
         return vehiculoRepository.findAll()
             .stream()
@@ -70,29 +81,34 @@ public class VehiculoService {
     }
 
     // ── OBTENER POR ID ─────────────────────────────────────────────
+    // Comprueba acceso antes de entregar un vehículo.
     public VehiculoResponseDTO obtenerPorId(UUID idVehiculo) {
         Vehiculo vehiculo = buscarVehiculoOrThrow(idVehiculo);
+        User usuarioAutenticado = obtenerUsuarioAutenticado();
+
+        validarPropietarioOAdmin(vehiculo, usuarioAutenticado);
         return mapearAResponse(vehiculo);
     }
 
     // ── ACTUALIZAR ─────────────────────────────────────────────────
+    // Comprueba propiedad o rol admin antes de editar.
     @Transactional
     public VehiculoResponseDTO actualizar(UUID idVehiculo, VehiculoRequestDTO dto) {
 
         Vehiculo vehiculo = buscarVehiculoOrThrow(idVehiculo);
         User usuarioAutenticado = obtenerUsuarioAutenticado();
 
-        validarPropietario(vehiculo, usuarioAutenticado);
+        validarPropietarioOAdmin(vehiculo, usuarioAutenticado);
 
-        String placaNormalizada = dto.placa().toUpperCase();
+        String placaNormalizada = placaVehiculoValidator.normalizarYValidar(dto.placa(), dto.tipoVehiculo());
 
         // Si cambió la placa, valida que la nueva no choque con otro vehículo.
         if (!placaNormalizada.equals(vehiculo.getPlaca())
                 && vehiculoRepository.existsByPlaca(placaNormalizada)) {
-            throw new RuntimeException("Ya existe un vehículo registrado con esa placa");
+            throw new IllegalStateException("Ya existe un vehículo registrado con esa placa");
         }
 
-        Marca marca = resolverMarca(dto.fkIdMarca(), dto.marcaSugerida(), usuarioAutenticado);
+        Marca marca = resolverMarca(dto.fkIdMarca());
 
         vehiculo.setMarca(marca);
         vehiculo.setPlaca(placaNormalizada);
@@ -104,12 +120,13 @@ public class VehiculoService {
     }
 
     // ── CAMBIAR ESTADO (borrado lógico) ────────────────────────────
+    // Activa o desactiva sin borrar el vehículo.
     @Transactional
     public VehiculoResponseDTO cambiarEstado(UUID idVehiculo, boolean activo) {
         Vehiculo vehiculo = buscarVehiculoOrThrow(idVehiculo);
         User usuarioAutenticado = obtenerUsuarioAutenticado();
 
-        validarPropietario(vehiculo, usuarioAutenticado);
+        validarPropietarioOAdmin(vehiculo, usuarioAutenticado);
 
         vehiculo.setEstado(activo);
         Vehiculo actualizado = vehiculoRepository.save(vehiculo);
@@ -124,70 +141,57 @@ public class VehiculoService {
      */
     private User obtenerUsuarioAutenticado() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuario autenticado no encontrado"));
+        return accountAccessService.activeUser(email);
     }
 
     private Vehiculo buscarVehiculoOrThrow(UUID idVehiculo) {
         return vehiculoRepository.findById(idVehiculo)
-            .orElseThrow(() -> new RuntimeException("Vehículo no encontrado"));
+            .orElseThrow(() -> new RecursoNoEncontradoException("Vehículo no encontrado"));
     }
 
     /**
-     * Un usuario solo puede modificar sus propios vehículos.
-     * NOTA: no distingue todavía rol ADMIN (pendiente anotado del tema
-     * de roles/seguridad) — por ahora esto aplica igual para cualquiera.
+     * Un usuario puede modificar su propio vehículo. Un ADMIN puede
+     * modificar el de cualquiera (necesario para el panel web).
      */
-    private void validarPropietario(Vehiculo vehiculo, User usuarioAutenticado) {
-        if (!vehiculo.getUsuario().getUserId().equals(usuarioAutenticado.getUserId())) {
-            throw new RuntimeException("No tienes permiso para modificar este vehículo");
+    private void validarPropietarioOAdmin(Vehiculo vehiculo, User usuarioAutenticado) {
+
+        boolean esDueño = vehiculo.getUsuario().getUserId().equals(usuarioAutenticado.getUserId());
+        if (esDueño) {
+            return;
+        }
+
+        boolean esAdmin = "ADMIN".equals(accountAccessService.currentRole(usuarioAutenticado));
+
+        if (!esAdmin) {
+            throw new AccessDeniedException("No tienes permiso para modificar este vehículo");
         }
     }
 
     /**
-     * Resuelve la marca del vehículo a partir de EXACTAMENTE uno de los
-     * dos campos del DTO:
-     *  - fkIdMarca: marca ya existente y aprobada en el catálogo.
-     *  - marcaSugerida: nombre nuevo, se crea con estado = false
-     *    (pendiente de aprobación del admin) y queda ligada al usuario
-     *    que la solicitó.
+     * Resuelve la marca del vehículo a partir del catálogo aprobado.
+     * El cliente ya no puede sugerir una marca nueva desde aquí: si no
+     * la encuentra, debe pedirle al admin que la agregue desde
+     * POST /api/marcas.
      */
-    private Marca resolverMarca(UUID fkIdMarca, String marcaSugerida, User usuarioAutenticado) {
-
-        boolean tieneIdMarca = fkIdMarca != null;
-        boolean tieneMarcaSugerida = marcaSugerida != null && !marcaSugerida.isBlank();
-
-        if (tieneIdMarca == tieneMarcaSugerida) {
-            // true == true (ambos) o false == false (ninguno): ambos casos inválidos
-            throw new RuntimeException(
-                "Debes indicar una marca existente (fkIdMarca) o sugerir una nueva (marcaSugerida), pero no ambos ni ninguno"
-            );
-        }
-
-        if (tieneIdMarca) {
-            return marcaRepository.findById(fkIdMarca)
-                .orElseThrow(() -> new RuntimeException("La marca seleccionada no existe"));
-        }
-
-        // Caso: marca sugerida por el cliente.
-        String nombreNormalizado = marcaSugerida.trim().toUpperCase();
-
-        // Si alguien más ya sugirió/tiene esa marca (sin importar su estado),
-        // reutilizamos el registro en vez de crear un duplicado.
-        return marcaRepository.findByNombreIgnoreCase(nombreNormalizado)
-            .orElseGet(() -> {
-                Marca nuevaMarca = new Marca();
-                nuevaMarca.setNombre(nombreNormalizado);
-                nuevaMarca.setEstado(false); // pendiente de aprobación del admin
-                nuevaMarca.setUsuarioSolicitante(usuarioAutenticado);
-                return marcaRepository.save(nuevaMarca);
-            });
+    private Marca resolverMarca(UUID fkIdMarca) {
+        return marcaRepository.findById(fkIdMarca)
+            .orElseThrow(() -> new RecursoNoEncontradoException("La marca seleccionada no existe"));
     }
 
     private VehiculoResponseDTO mapearAResponse(Vehiculo vehiculo) {
+
+        User usuario = vehiculo.getUsuario();
+
+        boolean tieneApellido = usuario.getLastName() != null && !usuario.getLastName().isBlank();
+        String nombreUsuario = tieneApellido
+            ? usuario.getFirstName() + " " + usuario.getLastName()
+            : usuario.getFirstName();
+
         return new VehiculoResponseDTO(
             vehiculo.getIdVehiculo(),
-            vehiculo.getUsuario().getUserId(),
+            usuario.getUserId(),
+            nombreUsuario,
+            usuario.getEmail(),
             vehiculo.getMarca().getIdMarca(),
             vehiculo.getMarca().getNombre(),
             vehiculo.getMarca().getEstado(),

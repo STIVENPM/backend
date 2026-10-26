@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,41 +20,47 @@ import com.lavarapido.backend_vehicular.servicios.dto.ServicioResponseDTO;
 import com.lavarapido.backend_vehicular.servicios.service.ServicioService;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/servicios")
-@RequiredArgsConstructor
 public class ServicioController {
 
     private final ServicioService servicioService;
 
+    public ServicioController(ServicioService servicioService) { this.servicioService = servicioService; }
+
+    // Recibe un servicio validado y devuelve 201.
     @PostMapping
     public ResponseEntity<ServicioResponseDTO> crear(@Valid @RequestBody ServicioRequestDTO request) {
         ServicioResponseDTO creado = servicioService.crear(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 
+    // Expone todo el catálogo de servicios.
     @GetMapping
     public ResponseEntity<List<ServicioResponseDTO>> listarTodos() {
         return ResponseEntity.ok(servicioService.listarTodos());
     }
 
+    // Expone solo servicios activos.
     @GetMapping("/disponibles")
     public ResponseEntity<List<ServicioResponseDTO>> listarDisponibles() {
         return ResponseEntity.ok(servicioService.listarDisponibles());
     }
 
+    // Pasa el nombre de búsqueda al servicio.
     @GetMapping("/buscar")
     public ResponseEntity<List<ServicioResponseDTO>> buscarPorNombre(@RequestParam String nombre) {
         return ResponseEntity.ok(servicioService.buscarPorNombre(nombre));
     }
 
+    // Busca un servicio por UUID.
     @GetMapping("/{id}")
     public ResponseEntity<ServicioResponseDTO> obtenerPorId(@PathVariable UUID id) {
         return ResponseEntity.ok(servicioService.obtenerPorId(id));
     }
 
+    // Valida los cambios de catálogo.
     @PutMapping("/{id}")
     public ResponseEntity<ServicioResponseDTO> actualizar(
             @PathVariable UUID id,
@@ -63,6 +68,7 @@ public class ServicioController {
         return ResponseEntity.ok(servicioService.actualizar(id, request));
     }
 
+    // Activa o desactiva un servicio.
     @PatchMapping("/{id}/estado")
     public ResponseEntity<ServicioResponseDTO> cambiarEstado(
             @PathVariable UUID id,
@@ -70,9 +76,4 @@ public class ServicioController {
         return ResponseEntity.ok(servicioService.cambiarEstado(id, activo));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable UUID id) {
-        servicioService.eliminar(id);
-        return ResponseEntity.noContent().build();
-    }
 }

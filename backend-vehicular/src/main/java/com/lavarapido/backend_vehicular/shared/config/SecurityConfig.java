@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 import org.springframework.http.HttpMethod;
@@ -35,6 +37,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
     private final AuthRateLimitFilter authRateLimitFilter;
+    private final Environment environment;
 
 
     @Bean
@@ -101,14 +104,19 @@ public class SecurityConfig {
                     "/api/auth/forgot-password",
                     "/api/auth/reset-password",
 
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-
-                    "/v3/api-docs/**",
-                    "/v3/api-docs",
-
                     "/error"
                 ).permitAll()
+
+                // Keep API documentation public for local development only.
+                // The production profile disables springdoc and must not publish these routes.
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/v3/api-docs"
+                ).access((authentication, context) ->
+                    new org.springframework.security.authorization.AuthorizationDecision(
+                        !environment.acceptsProfiles(Profiles.of("prod"))))
                 .requestMatchers(HttpMethod.GET, "/healthz").permitAll()
                 // Salud publica para diagnosticar el backend sin iniciar sesion.
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()

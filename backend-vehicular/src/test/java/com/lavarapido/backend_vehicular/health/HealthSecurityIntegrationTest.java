@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
@@ -35,11 +36,15 @@ class HealthSecurityIntegrationTest {
     private final AccountAccessService accountAccessService = mock(AccountAccessService.class);
     private AnnotationConfigWebApplicationContext context;
     private MockMvc mockMvc;
+    private boolean productionProfile;
 
     @BeforeEach
     void setUp() {
         context = new AnnotationConfigWebApplicationContext();
         context.setServletContext(new MockServletContext());
+        if (productionProfile) {
+            context.getEnvironment().setActiveProfiles("prod");
+        }
         context.addBeanFactoryPostProcessor(beanFactory -> {
             beanFactory.registerSingleton("jwtService", jwtService);
             beanFactory.registerSingleton("accountAccessService", accountAccessService);
@@ -57,7 +62,8 @@ class HealthSecurityIntegrationTest {
     @Test
     void healthCheckIsPublicAndReturnsUp() throws Exception {
         mockMvc.perform(get("/healthz"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(content().json("{\"status\":\"UP\"}"));
     }
 
     @Test
@@ -70,6 +76,30 @@ class HealthSecurityIntegrationTest {
     void protectedEndpointRejectsAnonymousRequests() throws Exception {
         mockMvc.perform(get("/api/protected"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void swaggerIsNotPublicInProduction() throws Exception {
+        productionProfile = true;
+        context.close();
+        setUp();
+
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/env"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void swaggerRemainsAvailableOutsideProduction() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

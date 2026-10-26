@@ -3,20 +3,15 @@ package com.lavarapido.backend_vehicular.vehiculos.dto;
 
 import com.lavarapido.backend_vehicular.vehiculos.enums.TipoVehiculo;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
 
+/** Recibe placa, color, tipo y marca del vehículo que se quiere registrar o actualizar. */
 public record VehiculoRequestDTO(
 
-    // Placa: acepta formato antiguo (ABC123) o nuevo (ABC12A).
-    // Se normaliza a mayúsculas en el service antes de guardar.
+    // Se valida junto con tipoVehiculo y se normaliza en PlacaVehiculoValidator.
     @NotNull(message = "La placa es obligatoria")
-    @Pattern(
-        regexp = "^[A-Za-z]{3}[0-9]{3}$|^[A-Za-z]{3}[0-9]{2}[A-Za-z]{1}$",
-        message = "La placa debe tener el formato ABC123 o ABC12A"
-    )
     String placa,
 
     @Size(max = 30, message = "El color no puede superar los 30 caracteres")

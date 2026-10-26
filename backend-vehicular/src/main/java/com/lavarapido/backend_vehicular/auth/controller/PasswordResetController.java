@@ -1,7 +1,14 @@
 package com.lavarapido.backend_vehicular.auth.controller;
 
 import com.lavarapido.backend_vehicular.auth.service.PasswordResetService;
+import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class PasswordResetController {
 
     private final PasswordResetService passwordResetService;
+    private static final Logger logger = LoggerFactory.getLogger(PasswordResetController.class);
 
     // ── ENDPOINT 1: El usuario pide recuperar su contraseña ──────────
     /**
@@ -23,15 +31,22 @@ public class PasswordResetController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(
-            @RequestBody ForgotPasswordRequest request,
+            @Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest) {
 
         // Captura la IP del solicitante para auditoría
         String ip = httpRequest.getRemoteAddr();
 
-        passwordResetService.solicitarRecuperacion(request.email(), ip);
+        // El servicio decide si existe una cuenta activa; la respuesta pública no lo revela.
+        try {
+            passwordResetService.solicitarRecuperacion(request.email(), ip);
+        } catch (EmailDeliveryException exception) {
+            // Registra solo el tipo de fallo de entrega, sin revelar si la cuenta existe.
+            logger.warn("Password reset email delivery failed: category={}, causeType={}",
+                    exception.failureCategory(), exception.rootCauseType());
+        }
 
-        // Siempre responde igual para no revelar si el email existe
+        // Incluso si falla el proveedor de correo se mantiene la misma respuesta.
         return ResponseEntity.ok("Si el correo está registrado, recibirás un enlace.");
     }
 
@@ -44,8 +59,9 @@ public class PasswordResetController {
      */
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(
-            @RequestBody ResetPasswordRequest request) {
+            @Valid @RequestBody ResetPasswordRequest request) {
 
+        // El servicio verifica el token de un solo uso antes de cambiar el hash.
         passwordResetService.resetearContrasena(
             request.token(),
             request.nuevaContrasena()
@@ -58,8 +74,13 @@ public class PasswordResetController {
     // Records de Java: clases simples de solo lectura para recibir el JSON
 
     /** Body del primer endpoint */
-    record ForgotPasswordRequest(String email) {}
+    record ForgotPasswordRequest(
+            @NotBlank(message = "El correo es obligatorio")
+            @Email(message = "El correo no tiene un formato valido")
+            String email) {}
 
     /** Body del segundo endpoint */
-    record ResetPasswordRequest(String token, String nuevaContrasena) {}
+    record ResetPasswordRequest(
+            @NotBlank String token,
+            @NotBlank @Size(min = 8, max = 72) String nuevaContrasena) {}
 }

@@ -1,14 +1,15 @@
 package com.lavarapido.backend_vehicular.auth.service;
 
 import com.lavarapido.backend_vehicular.auth.entity.TokenRecuperacion;
+import com.lavarapido.backend_vehicular.auth.exception.EmailDeliveryException;
 import com.lavarapido.backend_vehicular.auth.repository.TokenRecuperacionRepository;
 import com.lavarapido.backend_vehicular.users.entity.User;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.mail.MailException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -35,33 +36,37 @@ public class PasswordResetService {
      * Busca el usuario por email, genera un token seguro,
      * lo guarda hasheado en BD y envía el enlace por correo.
      *
-     * Si el email no existe no lanza error (por seguridad,
-     * no revelamos si el correo está registrado o no).
+     * No diferencia públicamente entre cuentas inexistentes e inactivas.
      */
     @Transactional
     public void solicitarRecuperacion(String email, String ipSolicitante) {
 
-        // Busca el usuario — si no existe termina silenciosamente
-        userRepository.findByEmail(email).ifPresent(usuario -> {
+        // Se termina sin error si el correo no existe o la cuenta está inactiva:
+        // el controlador dará la misma respuesta y no permite enumerar cuentas.
+        User usuario = userRepository.findByEmail(email).orElse(null);
+        if (usuario == null || !Boolean.TRUE.equals(usuario.getStatus())) return;
 
-            // Genera token aleatorio seguro en texto plano
-            String tokenPlano = generarTokenSeguro();
+        // El valor aleatorio viaja por correo; la base solo conserva su SHA-256.
+        String tokenPlano = generarTokenSeguro();
+        String tokenHash = hashearSHA256(tokenPlano);
 
-            // Hashea el token con SHA-256 para guardarlo en BD
-            String tokenHash = hashearSHA256(tokenPlano);
+        TokenRecuperacion token = new TokenRecuperacion();
+        token.setUsuario(usuario);
+        token.setTokenHash(tokenHash);
+        token.setExpiracionAt(LocalDateTime.now().plusMinutes(TTL_MINUTOS));
+        token.setUsado(false);
+        token.setIpSolicitante(ipSolicitante);
+        // Persiste el hash; el token plano solo se envía en el enlace.
+        // Una nueva solicitud invalida los tokens anteriores de esta cuenta.
+        tokenRepository.invalidarTokensActivosPorUsuario(usuario.getUserId());
+        tokenRepository.saveAndFlush(token);
 
-            // Construye y guarda la entidad en tokens_recuperacion
-            TokenRecuperacion token = new TokenRecuperacion();
-            token.setUsuario(usuario);
-            token.setTokenHash(tokenHash);
-            token.setExpiracionAt(LocalDateTime.now().plusMinutes(TTL_MINUTOS));
-            token.setUsado(false);
-            token.setIpSolicitante(ipSolicitante);
-            tokenRepository.save(token);
-
-            // Envía el correo con el token en texto plano
-            emailService.enviarCorreoRecuperacion(email, tokenPlano);
-        });
+        try {
+            // Si el envío falla, la excepción revierte esta transacción y el token nuevo.
+            emailService.enviarCorreoRecuperacion(usuario.getEmail(), tokenPlano);
+        } catch (MailException | IllegalStateException exception) {
+            throw new EmailDeliveryException("No fue posible enviar el correo de recuperacion", exception);
+        }
     }
 
     // ── PASO 2: El usuario hace clic en el enlace y manda nueva contraseña ──
@@ -74,22 +79,27 @@ public class PasswordResetService {
      */
     @Transactional
     public void resetearContrasena(String tokenPlano, String nuevaContrasena) {
+        PasswordRules.requireValid(nuevaContrasena);
+        if (tokenPlano == null || tokenPlano.isBlank()) {
+            throw new IllegalArgumentException("Token invalido");
+        }
 
         // Hashea el token recibido para buscarlo en BD
         String tokenHash = hashearSHA256(tokenPlano);
 
         // Busca el token en BD
+        // La consulta bloquea la fila durante la transacción para evitar dos usos simultáneos.
         TokenRecuperacion token = tokenRepository.findByTokenHash(tokenHash)
-            .orElseThrow(() -> new RuntimeException("Token inválido"));
+            .orElseThrow(() -> new IllegalArgumentException("Token invalido"));
 
         // Verifica que no haya sido usado antes
         if (token.getUsado()) {
-            throw new RuntimeException("El token ya fue utilizado");
+            throw new IllegalArgumentException("Token invalido");
         }
 
         // Verifica que no haya expirado
         if (LocalDateTime.now().isAfter(token.getExpiracionAt())) {
-            throw new RuntimeException("El token ha expirado");
+            throw new IllegalArgumentException("Token invalido");
         }
 
         // Actualiza la contraseña del usuario con BCrypt
@@ -97,7 +107,8 @@ public class PasswordResetService {
         usuario.setPassword(passwordEncoder.encode(nuevaContrasena));
         userRepository.save(usuario);
 
-        // Marca el token como usado para que no pueda reutilizarse
+        // Contraseña y marca de uso se guardan en la misma transacción.
+        // El token no podrá reutilizarse después de confirmar el cambio.
         token.setUsado(true);
         tokenRepository.save(token);
     }
@@ -116,7 +127,7 @@ public class PasswordResetService {
 
     /**
      * Hashea un String con SHA-256 y retorna el resultado en hexadecimal.
-     * El hash tiene exactamente 64 caracteres, coincide con CHAR(64) en BD.
+     * El hash tiene exactamente 64 caracteres y cabe en VARCHAR(64) de la BD.
      */
     private String hashearSHA256(String input) {
         try {

@@ -10,17 +10,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Entity
 @Table(name = "servicios")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class Servicio {
 
     @Id
@@ -48,4 +40,15 @@ public class Servicio {
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+
+    public Servicio() { }
+    public Servicio(UUID idServicio, String nombre, String descripcion, BigDecimal precio, Integer duracionMinutos, Boolean estado, LocalDateTime createdAt, LocalDateTime updatedAt) { this.idServicio=idServicio; this.nombre=nombre; this.descripcion=descripcion; this.precio=precio; this.duracionMinutos=duracionMinutos; this.estado=estado; this.createdAt=createdAt; this.updatedAt=updatedAt; }
+    public UUID getIdServicio() { return idServicio; } public void setIdServicio(UUID value) { idServicio=value; }
+    public String getNombre() { return nombre; } public void setNombre(String value) { nombre=value; }
+    public String getDescripcion() { return descripcion; } public void setDescripcion(String value) { descripcion=value; }
+    public BigDecimal getPrecio() { return precio; } public void setPrecio(BigDecimal value) { precio=value; }
+    public Integer getDuracionMinutos() { return duracionMinutos; } public void setDuracionMinutos(Integer value) { duracionMinutos=value; }
+    public Boolean getEstado() { return estado; } public void setEstado(Boolean value) { estado=value; }
+    public LocalDateTime getCreatedAt() { return createdAt; } public void setCreatedAt(LocalDateTime value) { createdAt=value; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; } public void setUpdatedAt(LocalDateTime value) { updatedAt=value; }
 }

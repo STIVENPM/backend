@@ -2,57 +2,70 @@ package com.lavarapido.backend_vehicular.users.controller;
 
 import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
 import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangeEmailRequestDTO;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
-import com.lavarapido.backend_vehicular.users.entity.User;
+import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserSessionDTO;
 import com.lavarapido.backend_vehicular.users.service.UserService;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+    public UserController(UserService userService) { this.userService = userService; }
 
-    // 🔥 REGISTRO
+    //  REGISTRO
+    // @Valid revisa el JSON antes de entrar al servicio; 201 confirma la cuenta creada.
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody UserRegistrationDTO dto) {
-
-        try {
-            User user = userService.registerUser(dto);
-            return ResponseEntity.ok(user);
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<UserRegistrationResponseDTO> register(@Valid @RequestBody UserRegistrationDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.registerUser(dto));
     }
 
-    // 🔐 LOGIN
+    //  LOGIN
+    // El servicio comprueba las credenciales y devuelve el JWT junto a datos públicos.
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginDTO dto) {
-
-        try {
-            LoginResponseDTO response = userService.login(dto);
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(401).body(e.getMessage());
-        }
+    public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginDTO dto) {
+        return ResponseEntity.ok(userService.login(dto));
     }
 
+    // Expone la identidad y el rol vigentes para el cliente.
+    @GetMapping("/me")
+    public ResponseEntity<UserSessionDTO> session() {
+        return ResponseEntity.ok(userService.getSession());
+    }
+
+    // Devuelve el perfil del usuario autenticado.
     @GetMapping("/profile")
-    public String profile() {
+    public ResponseEntity<UserProfileResponseDTO> profile() {
+        return ResponseEntity.ok(userService.getProfile());
+    }
 
-        var auth = SecurityContextHolder
-                .getContext()
-                .getAuthentication();
+    // Valida el JSON y delega la actualización del perfil.
+    @PutMapping("/profile")
+    public ResponseEntity<UserProfileResponseDTO> updateProfile(@Valid @RequestBody UserProfileUpdateDTO dto) {
+        return ResponseEntity.ok(userService.updateProfile(dto));
+    }
 
-        String email = auth.getName();
+    // Cambia la contraseña de la cuenta identificada por el JWT.
+    @PutMapping("/password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequestDTO dto) {
+        userService.changePassword(dto);
+        return ResponseEntity.noContent().build();
+    }
 
-        return "Authenticated user: " + email;
+    // Cambia el correo de la cuenta autenticada tras comprobar la contraseña actual.
+    @PutMapping("/email")
+    public ResponseEntity<UserProfileResponseDTO> changeEmail(@Valid @RequestBody ChangeEmailRequestDTO dto) {
+        return ResponseEntity.ok(userService.changeEmail(dto));
     }
 }

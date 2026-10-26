@@ -2,109 +2,170 @@ package com.lavarapido.backend_vehicular.users.service;
 
 import com.lavarapido.backend_vehicular.auth.dto.LoginDTO;
 import com.lavarapido.backend_vehicular.auth.dto.LoginResponseDTO;
+import com.lavarapido.backend_vehicular.auth.service.PasswordRules;
+import com.lavarapido.backend_vehicular.security.AccountAccessService;
 import com.lavarapido.backend_vehicular.security.JwtService;
 import com.lavarapido.backend_vehicular.users.dto.UserRegistrationDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangePasswordRequestDTO;
+import com.lavarapido.backend_vehicular.users.dto.ChangeEmailRequestDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserProfileResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserProfileUpdateDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserRegistrationResponseDTO;
+import com.lavarapido.backend_vehicular.users.dto.UserSessionDTO;
 import com.lavarapido.backend_vehicular.users.entity.User;
+import com.lavarapido.backend_vehicular.users.exception.CurrentPasswordInvalidException;
 import com.lavarapido.backend_vehicular.users.repository.UserRepository;
-import com.lavarapido.backend_vehicular.users.repository.UserRoleRepository;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
 
 @Service
 public class UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private JwtService jwtService;
+    private final JwtService jwtService;
 
-    @Autowired
-    private UserRoleRepository userRoleRepository;
+    private final AccountAccessService accountAccessService;
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, AccountAccessService accountAccessService) { this.userRepository=userRepository; this.passwordEncoder=passwordEncoder; this.jwtService=jwtService; this.accountAccessService=accountAccessService; }
 
-    // 🔥 REGISTRO DE USUARIO
-    // @Transactional garantiza que si ocurre un error durante el proceso,
-    // toda la operacion se revierte automaticamente (rollback)
-    // evitando registros incompletos o inconsistentes en base de datos
+    // Registra la cuenta en una transacción: un fallo revierte el guardado.
     @Transactional
-    public User registerUser(UserRegistrationDTO dto) {
+    public UserRegistrationResponseDTO registerUser(UserRegistrationDTO dto) {
 
-        // verifica disponibilidad del correo para evitar duplicados
-        // antes de intentar guardar en la base de datos
-        if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new RuntimeException("el correo ya esta registrado");
+        // Rechaza una contraseña inválida antes de crear la entidad.
+        PasswordRules.requireValid(dto.getPassword());
+
+        // Comprueba el correo antes del guardado; la columna UNIQUE de BD también
+        // impide duplicados si dos registros llegan al mismo tiempo.
+        String email = normalizeEmail(dto.getEmail());
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new IllegalStateException("El correo ya esta registrado");
         }
 
-        // se crea una nueva instancia de la entidad User
-        // que sera persistida en la tabla users
+        // La nueva cuenta nace activa; sin un rol explícito se tratará como USER.
         User user = new User();
 
-        // transferencia manual de datos desde el DTO hacia la entidad
-        // este proceso se conoce como mapeo manual
-        user.setEmail(dto.getEmail());
+        // Mapea los datos permitidos del DTO; el cliente no asigna estado ni rol.
+        user.setEmail(email);
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
         user.setPhoneNumber(dto.getPhoneNumber());
         user.setDocumentType(dto.getDocumentType());
         user.setDocumentNumber(dto.getDocumentNumber());
 
-        // encriptacion de la contrasena usando BCrypt
-        // nunca se debe guardar la contrasena en texto plano
-        // el resultado encaja con CHAR(60) en PostgreSQL
+        // Aquí la contraseña del DTO se convierte en hash BCrypt antes de persistir.
         user.setPassword(
             passwordEncoder.encode(dto.getPassword())
         );
 
-        // guarda el usuario en la base de datos
-        // Hibernate genera el UUID automaticamente y retorna
-        // el objeto persistido con sus datos completos
-        return userRepository.save(user);
+        // Persiste la cuenta y devuelve sus datos públicos, sin contraseña.
+        User saved = userRepository.save(user);
+        return new UserRegistrationResponseDTO(saved.getUserId(), saved.getFirstName(), saved.getEmail());
     }
 
-// 🔐 LOGIN DE USUARIO
-public LoginResponseDTO login(LoginDTO dto) {
+    // Compara la contraseña enviada con el hash guardado y emite el JWT.
+    public LoginResponseDTO login(LoginDTO dto) {
+        User user = userRepository.findByEmailIgnoreCase(normalizeEmail(dto.getEmail()))
+                .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
+        if (!Boolean.TRUE.equals(user.getStatus())
+                || !passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException("Credenciales incorrectas");
+        }
 
-    var userOpt = userRepository.findByEmail(dto.getEmail());
-
-    if (userOpt.isEmpty()) {
-        throw new RuntimeException("Usuario no encontrado");
+        String roleName = accountAccessService.currentRole(user);
+        String token = jwtService.generateToken(user.getUserId(), user.getEmail());
+        LoginResponseDTO.UserInfoDTO info = new LoginResponseDTO.UserInfoDTO(
+                user.getUserId().toString(), user.getFirstName(), user.getEmail(), roleName);
+        return new LoginResponseDTO(token, info);
     }
 
-    User user = userOpt.get();
-
-    boolean valid = passwordEncoder.matches(
-        dto.getPassword(),
-        user.getPassword()
-    );
-
-    if (!valid) {
-        throw new RuntimeException("Contrasena incorrecta");
+    // Vuelve a consultar el usuario y su rol actual para /users/me.
+    public UserSessionDTO getSession() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = accountAccessService.activeUser(email);
+        return new UserSessionDTO(user.getUserId(), user.getFirstName(), user.getEmail(),
+                accountAccessService.currentRole(user));
     }
 
-    var userRoleOpt = userRoleRepository
-            .findActiveRoleByUserId(user.getUserId());
+    // Devuelve el perfil del usuario autenticado.
+    public UserProfileResponseDTO getProfile() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = accountAccessService.activeUser(email);
+        return UserProfileResponseDTO.from(user);
+    }
 
-    String roleName = userRoleOpt
-            .map(ur -> ur.getRole().getRoleName())
-            .orElse("USER");
+    // Actualiza solo los datos de perfil permitidos.
+    @Transactional
+    public UserProfileResponseDTO updateProfile(UserProfileUpdateDTO dto) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = accountAccessService.activeUser(email);
 
-    // ← MODIFICADO: ahora se pasa el rol como segundo argumento
-    String token = jwtService.generateToken(user.getEmail(), roleName);
+        user.setFirstName(dto.getFirstName());
+        user.setLastName(dto.getLastName());
+        user.setPhoneNumber(dto.getPhoneNumber());
+        if (dto.getProfilePicture() != null) {
+            user.setProfilePicture(dto.getProfilePicture());
+        }
 
-    LoginResponseDTO.UserInfoDTO info =
-            new LoginResponseDTO.UserInfoDTO(
-                    user.getUserId().toString(),
-                    user.getFirstName(),
-                    user.getEmail(),
-                    roleName
-            );
+        return UserProfileResponseDTO.from(userRepository.save(user));
+    }
 
-    return new LoginResponseDTO(token, info);
-}
+    // Cambia únicamente el correo de la identidad autenticada tras verificar su contraseña.
+    @Transactional
+    public UserProfileResponseDTO changeEmail(ChangeEmailRequestDTO dto) {
+        Authentication authentication = authenticatedPrincipal();
+        User user = accountAccessService.activeUser(authentication.getName());
+        if (!passwordEncoder.matches(dto.currentPassword(), user.getPassword())) {
+            throw new CurrentPasswordInvalidException();
+        }
+
+        String email = normalizeEmail(dto.newEmail());
+        if (userRepository.existsByEmailIgnoreCaseAndUserIdNot(email, user.getUserId())) {
+            throw new IllegalStateException("El correo ya esta registrado");
+        }
+        if (!user.getEmail().equals(email)) {
+            user.setEmail(email);
+            userRepository.save(user);
+        }
+        return UserProfileResponseDTO.from(user);
+    }
+
+    // Actualiza la contraseña de la cuenta autenticada, sin aceptar un ID del cliente.
+    @Transactional
+    public void changePassword(ChangePasswordRequestDTO dto) {
+        Authentication authentication = authenticatedPrincipal();
+        User user = accountAccessService.activeUser(authentication.getName());
+        if (!passwordEncoder.matches(dto.currentPassword(), user.getPassword())) {
+            throw new CurrentPasswordInvalidException();
+        }
+
+        PasswordRules.requireValid(dto.newPassword());
+        user.setPassword(passwordEncoder.encode(dto.newPassword()));
+        userRepository.save(user);
+    }
+
+    private Authentication authenticatedPrincipal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getName() == null || authentication.getName().isBlank()
+                || "anonymousUser".equals(authentication.getName())) {
+            throw new BadCredentialsException("Invalid session");
+        }
+        return authentication;
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("El correo es obligatorio");
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
 }

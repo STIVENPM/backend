@@ -9,19 +9,21 @@ import org.springframework.stereotype.Service;
 import com.lavarapido.backend_vehicular.servicios.dto.ServicioRequestDTO;
 import com.lavarapido.backend_vehicular.servicios.dto.ServicioResponseDTO;
 import com.lavarapido.backend_vehicular.servicios.entity.Servicio;
+import com.lavarapido.backend_vehicular.servicios.exception.DuplicateServiceNameException;
 import com.lavarapido.backend_vehicular.servicios.repository.ServicioRepository;
 
-import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class ServicioService {
 
     private final ServicioRepository servicioRepository;
 
+    public ServicioService(ServicioRepository servicioRepository) { this.servicioRepository = servicioRepository; }
+
+    // Evita nombres repetidos y guarda el servicio activo.
     public ServicioResponseDTO crear(ServicioRequestDTO request) {
         if (servicioRepository.existsByNombre(request.getNombre())) {
-            throw new IllegalArgumentException("Ya existe un servicio con ese nombre");
+            throw new DuplicateServiceNameException();
         }
 
         Servicio servicio = new Servicio();
@@ -35,6 +37,7 @@ public class ServicioService {
         return mapearAResponse(guardado);
     }
 
+    // Consulta todos los servicios.
     public List<ServicioResponseDTO> listarTodos() {
         return servicioRepository.findAll()
                 .stream()
@@ -42,6 +45,7 @@ public class ServicioService {
                 .collect(Collectors.toList());
     }
 
+    // Filtra los servicios activos.
     public List<ServicioResponseDTO> listarDisponibles() {
         return servicioRepository.findByEstadoTrue()
                 .stream()
@@ -49,6 +53,7 @@ public class ServicioService {
                 .collect(Collectors.toList());
     }
 
+    // Busca servicios por nombre.
     public List<ServicioResponseDTO> buscarPorNombre(String nombre) {
         return servicioRepository.findByNombreContainingIgnoreCase(nombre)
                 .stream()
@@ -56,19 +61,21 @@ public class ServicioService {
                 .collect(Collectors.toList());
     }
 
+    // Busca el servicio o informa que no existe.
     public ServicioResponseDTO obtenerPorId(UUID id) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));
         return mapearAResponse(servicio);
     }
 
+    // Edita catálogo y vuelve a comprobar el nombre.
     public ServicioResponseDTO actualizar(UUID id, ServicioRequestDTO request) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));
 
         if (!servicio.getNombre().equalsIgnoreCase(request.getNombre())
                 && servicioRepository.existsByNombre(request.getNombre())) {
-            throw new IllegalArgumentException("Ya existe un servicio con ese nombre");
+            throw new DuplicateServiceNameException();
         }
 
         servicio.setNombre(request.getNombre());
@@ -80,17 +87,14 @@ public class ServicioService {
         return mapearAResponse(actualizado);
     }
 
-    public ServicioResponseDTO cambiarEstado(UUID id, boolean nuevoEstado) {
+    // Cambia disponibilidad sin borrar el servicio.
+    public ServicioResponseDTO cambiarEstado(UUID id, boolean activo) {
         Servicio servicio = servicioRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Servicio no encontrado"));
 
-        servicio.setEstado(nuevoEstado);
+        servicio.setEstado(activo);
         Servicio actualizado = servicioRepository.save(servicio);
         return mapearAResponse(actualizado);
-    }
-
-    public void eliminar(UUID id) {
-        cambiarEstado(id, false);
     }
 
     private ServicioResponseDTO mapearAResponse(Servicio servicio) {
